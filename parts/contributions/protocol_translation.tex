@@ -1,13 +1,68 @@
 \chapter{Protocol Translation}
+\hl{In this section we describe the details that pertain to the process of translating reo connectors from one form to another. the notion of "runtime" becomes less useful when so many different tools are interacting, but this is everything but the runtime of the target application.}
+
 \section{Two-Phase Generation}
+\hl{In previous works, reo generates the target code directly. }
+
 \subsection{Motivation}
-\subsection{Imperative Rule Form}
+
+\hl{Reo's Java back-end generates t}
+
+\subsection{Imperative Form}
+\hl{In this work, we introduce a new intermediate representation for the reo compiler, which we will refer to as \textit{imperative form}. based on what can be described in an RBA. }
+
+\subsubsection{Data Actions}
+\hl{we implement synchronous interactions as a sequence of actions. this takes some care, as this translation gets hairy. eg: overwriting memory in the correct order. }
+
+\subsubsection{Rules as Transactions}
+\hl{
+The Reo compiler has support for the TRANSFORM channel, which essentially allows the invocation of arbitrary functions in the circuit. eg $A=f(B)$ this gets complicated because these operations can be used in guards, assignments or both (as in $A=f(B)=m'$) the counter-intuitive thing is that the value must be computed to decide IF the rule may fire, yet we don't want the value if it does not. 
+Instead, we model rule firings as TRANSACTIONS which can be rolled back. for every rule the last chance to roll back must precent the first VISIBLE EFFECT. 
+
+we support this functionality with INSTRUCTIONS which are performed in sequence. these instructions can perform operations on data, such as creation of new elements, and it may trigger a ROLLBACK
+}
+
 \section{Code Generation}
+
 \subsection{Reo Side}
+\hl{we discuss the task of translating a declarative reo description into imperative form }
+
 \subsubsection{Compiler Internal Representation}
-\subsubsection{Sequentializing}
+\hl{compiler internal repr. is very similar to RBA with some extra information such as the direction of ports. some information is provided, such as figuring out the ASSIGNMENT to ports and memory cells}
+
+\subsubsection{Group by Resource}
+\hl{primarily want to find the mapping from putter to getters. this follows the FLOW of the DATA. ultimately we need}
+
 \subsubsection{Type Constraining}
+\hl{once the flow has been determined, we can see which operations must be supported on the target thing: mostly equality and clone operations. we wish to generate GENERIC protocols. so this requires TYPE CLUSTERNG and CONSTRAINING}
+
 \subsection{Rust Side}
+\hl{
+imperative form is still too high-level to be used directly. what happens next is very language specific, and can be approached many ways. the section to follow explains how the final transformed rust works at runtime. Here, we concentrate only on getting it into that form.
+}
+
+\subsubsection{Runtime Interpreter}
+\hl{many approaches are possible for translating the imperative form. in this work we go with an approach that is relatively abstract by implementing a lightweight INTERPRETER that is essentially instantiated with a small program that corresponds strongly with the abstract interpretive form. 
+	This was done for several reasons: 
+	1. extensive virtualization
+	2. pushes protocol instantiation later into the instantiation process so more decisions can be made at the last moment
+	3. represents more stuff as DATA relying less on monomorphization from generic types (as is the usual rust idiom), which makes it more inter-operable with C
+	4. a data-oriented representation is more friendly to FFI. 
+	5. runtime configuration}
+
 \subsubsection{Checking and Errors}
+\hl{Assuming that they are described using conventional data structures (sets, maps, lists, etc.) rba rules can be malformed. for example, checking a value not in the firiing set. As  Imperative form orients its description according to TIME and not VALUE, the operations on the same values are decoupled and spread out, creating many new possibiltiies of ill-formed operations. for example, moving a value that is only constructed later. These problems are familiar to sequential programming, as expected. the parallel is trying to manipulate a variable out of scope. etc.
+To complement the throughline of "separating concerns", building a protocol object can FAIL, returning error. some failures are necessary for the build phase (eg: the builder does not know how to represent the movement of a value that has not been defined, as it does now know its data type), and other checks can result in sensible protocol objects but which would do something INVALID at runtime. for example, it would be possible to represent the consumption of a value whose name is in scope, but known to be EMPTY, but it would result in reading uninitialized memory at runtime.
+}
+
+
+
 \subsubsection{Optimization}
-\subsubsection{Commandification}
+\hl{the INNER form of the rust protocol objects are indeed translated into a still more-complicated form for the purposes of optimization:
+1. uses representations which are less convenient to use, but run more efficiently for their intended purpose (eg fusing port and memory readiness as they are usually checked togehter)
+2. assumes that it is WELL FORMED to save the time that would be spent checking (eg: it can assume that a putter and getter expect the same data type. If it knows one, it does not need to look up the other)
+}
+
+
+\subsection{Function Calls}
+\hl{Reo and RBAs in general support syntax for the TRANSFORM channel. these channels are particularly interesting because they blur the line between coordination and computation. in Reo, transform channels are intuitive: they output something which is a transformation of their input. done asynchronously, it is very clear to see how this would work. Unfortunately, Reo is synchronous which creates an interesting problem. Here, we see an instance of it in an RBA constraint: $f(P_0)=f(P_1)=C$. Let $P_0$ and $P_1$ be producers (they output into the protocol), and $C$ is a consumer, and $f$ is some unary function. This formulation has an interesting interpretation in the imperative realm: $C$ gets some datum that is computed using $f$, but \textit{only} if $f(P_0)=f(P_1)$. As $f$ is some arbitrary function, we must invoke $f$ before we know whether the result should be observed by $C$. }

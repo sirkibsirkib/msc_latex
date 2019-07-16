@@ -1,20 +1,266 @@
-\chapter{Static Governors}
-\section{Problem: Unintended Constraints}
-\section{Governor Defined}
+\chapter{Generating Static Governors}
+\label{sec:api}
+A protcol's \textit{governor} acts to ensure that all the actions of a component are \textit{adherent} to the protocol with which it interfaces, guaranteeing that its actions will not violate the protocol. In this section, we develop a means of embedding governors into Rust's affine type system. As a result, an application developer may ergonomically opt-into checking protocol adherence of their own compute-code using their local Rust compiler, whereafter successful compilation guarantees adherence to the protocol.
+
+In more precise terms, let protocol $A$ be \textit{protocol adherent} to protocol $B$ if and only if the \textit{synchronous composition} of $A$ and $B$ is language-equivalent to $B$; equivalently, $A$ is adherent to $B$ and $A$ adheres to $B$. This can be understood as $A$ contributing no constraints to the composed system that $B$ did not have already.
+
+\section{The Problem: Unintended Constraints}
+\label{sec:unintended_constraints}
+A central tenet of Reo's design is the \textit{separation of concerns}, part of which is the desire to minimize the knowledge a compute component must have of its protocol. In this view, coordinating the movements of data is not a concern relevant to the task of computation. A desirable balance is possible with the observation that protocol objects are able to partially impose protocol adherence on their neighbors; External ports may instigate a \code{put} or \code{get} at any moment, and the \textit{coordinator} will complete them as soon as the protocol definition allows it. In this way, coordinators possess a crucial subset of the features of \textit{governers}: aligning the \textit{timing} of two actions that compose an interaction. Unfortunately, in the properties of the realm of sequential, action-centric programming itself \textit{implicitly} imposes constraints on the behavior of the system: \code{put} or \code{get} block until their interaction is completed, and no subsequent code (potentially, other port operations) will occur until they do. This is beyond the capabilities of the coordinator to influence.
+
+In the context of application development, this has an interesting consequence; the behavior of the system is influenced by the behavior of (potentially) all of its components. This is sensible in theory, but becomes unwieldy in practice. Even small changes to the behavior of a compute component influences the system's behavior in unexpected ways, as we are not used to thinking about synchronous code as a composable protocol, nor are we able to intuit the \textit{outcome} of the composition. For example, Listing~\ref{listing:transform_not} gives the definition of a compute function which a user may write to interact with a protocol. When \code{p} and \code{g} are connected to a \textit{fifo1} protocol (which forwards \code{p} to \code{g}, buffering it asynchronously in-between), it runs forever and the output will be something like:
+\begin{verb}
+	I saw true. I saw false. I saw true. I saw false. (...)
+\end{verb}.\\However, when connected with the \textit{sync} protocol (which forwards \code{p} to \code{g} synchronously), the system has no behavior. The problem is that even though \textit{fifo1} and \textit{sync} have the same \textit{interface}, \code{transform\_not} is \textit{compatible} (can be made to adhere) with the former and not the latter. By definition, \textit{sync} fires when \textit{both} \code{p} and \code{g} are ready, but \code{transform\_rot} does not \code{put} until the \code{get} is completed. Once the intricacies of these programs grow beyond a programmer's ability to keep track of these relationships, the composed system may have \textit{unintended} behavior. This property may be obvious at the small scale of this example, but it becomes more difficult the larger and more complex the program becomes. In the worst cases, an innocuous change makes an interaction becoming unreachable, manifesting at runtime as \textit{deadlock}. 
+
+
+\begin{listing}[ht]
+	\inputminted[]{rust}{transform_not.rs}
+	\caption[Rust example of a compute component.]{A function in Rust which can be used as a compute component in a system, connected to a protocol component.}
+	\label{listing:transform_not}
+\end{listing}
+
+
+%That said, the Reo compiler aims to generate code which describes \textit{eac}
+%
+%In this section
+%
+%1. intro to the problem at high level.
+%2. you are writing a more complicated component. multiple ports yeah!
+%3. oh no its not behaving as expected!
+%4. section guide
+
+\section{Governors Defined}
+\label{sec:governor}
+In this work, we accept that it is necessary to write compute code that has blocking behavior. Rather than attempting to empower the coordinator with the ability to further influence its boundary components, we introduce explicit governors into our applications such that from the protocol's perspective, the components appear to manage themselves. A particular compute component requires a particular governor as the behavior permitted to the compute component is a function of its \textit{interface} with the protocol.
+
+Ultimately, all governors have in common that they enforce adherence to a given protocol on the components they govern. However, governors may differ on \textit{when} and \textit{how} this enforcement manifest. For example, a governor may intercept and filter network messages at runtime, while another checks for deviations \textit{statically} and emitting compiler errors.
+
+In this work, we leverage the unique expressiveness of the Rust language by creating a tool which generates protocol-specific governor code. When used by an application developer, these governors assess the protocol adherence of compute functions \textit{statically}, and prevent compilation if deviations are detected. As such, these governor are absent from the compiled binary.
+
 \section{Solution: Static Governance with Types}
-\section{Functionality}
-\subsection{encoding CA and RBA as Type-State Automata}
+\hl{TODO}
+
+\section{Making it Functional}
+This section details the workings of the \textbf{Governor generator} tool which generates Rust code given (a) a representation of a protocol's RBA, and (b) the set of ports which comprise the interface of the compute component to be governed.
+
+\subsection{Encoding CA and RBA as Type-State Automata}
+% How to do type-state pattern for CA and RBA
+\label{sec:type_space_automaton}
+The \textit{type state} pattern described in Section~\ref{sec:type_state} provides a means of encoding finite state machines as affine types. Their utility is in guaranteeing that all runtime traces of the resulting program correspond to runs in the automaton. For this class of machines, the encoding is very natural, as there can be a one-to-one correspondence between the states of the abstract automaton, and the types required to represent them. This is also the case for transitions and functions; in the worst case, this mapping is one-to-one also. For an arbitrary transition from states $a$ to $b$ with label $x$, a function can be declared to consume the type for $a$, return the type for $b$, and perform the work associated with $x$ in its body.
+
+The encoding is more complicated for CA, where not only states but data constraints must be encoded into types and must interact with transitions. One approach is to treat \textit{configurations} as \textit{states} were treated before by enumerating them into types. For example, the configuration of state $q_0$ with memory cell $m=0$ is represented by type \code{q\_0\_0}, while state $q_0$ with $m=1$ is represented by \code{q\_0\_1}. On a case-by-case basis, one might be able to represent several configurations using one type in the event these configurations are never \textit{distinguished}. For example, a connector may involve positive integers, but only distinguish their values according to whether they are \textit{odd} or \textit{even} and nothing else; in this case \{\code{q\_0\_0}, \code{q\_0\_1}, \code{q\_0\_2}, ...\} may be collapsed to \{\code{q\_0\_odd}, \code{q\_0\_even}\}. For an arbitrary case unique types are needed for every combination of state with every value of every variable. As RBAs are instances of CA, we are able to represent them using the same procedure. As RBAs are used by both the Reo compiler and Reo-rs, they are the model of choice for governors also. 
+
 \subsection{Rule Consensus}
+% how to represent choice
+\label{sec:rule_consensus}
+Thus far, we have reasoned about operations on RBAs that preserve their ability to simulate the non-silent port actions of the original. However, at runtime the protocol's state will follow a \textit{particular} path, which may not be the only one possible. When two distinct paths branch out from the current configuration, which one should the governor follow such that it can enforce the correct actions? Consider the protocol \textit{fifo2} once again, and observe that from type-state \code{(E,F)}, two rules may be fired next, one firing $A$ and the other firing $B$. The governor must enforce $A$ if and only if the protocol's state goes down the path for $A$, and likewise for $B$. This is an instance of the \textit{consensus} problem; all RBAs in the system must agree on the path taken such that they can proceed in lockstep.
+
+Many synthetic solutions are possible for creating consensus, as we can determine a meta-protocol ahead of time for both governors and protocol to follow such that consensus emerges at runtime. For example, by \textit{ordering} the protocol's rules, and having all parties prioritize rules by ascending order, choice is statically eliminated. Even this simple solution is deceptively nuanced, as the normalization procedure breaks the 1-to-1 correspondence between the rules of the protocol, and the rules of a governor. 
+
+Instead, this work takes the approach of statically `electing' the \textit{coordinator} as the leader in every case, and having all governors follow the lead of its arbitrary choice. This approach is primarily motivated by its \textit{flexibility}; by supporting an arbitrary choice on the part of the protocol, we make the choice itself an \textit{orthogonal} concern for future work. Electing the coordinator in particular as the leader is also a natural choice, as it is the only RBA in the system with a complete view of the protocol's state, and thus can make the choice as a function of its \textit{un-approximated} configuration, as well as the values of all port-putters dynamically.
+
+In terms of implementation, the Rust function for a rule no longer returns a \textit{particular} type-state token, but rather a \code{StateSet} object representing an indeterminate state-type which will \textit{later} be chosen from the elements of the set. This type is entirely opaque other than a function to code{determine} it. At runtime, \textit{determine} blocks until the governor receives a message from the protocol, communicating a particular choice. For cases where the \code{StateSet} is a singleton, \code{determine} simply unwraps the element. While the decision is made at \textit{runtime}, the type-state automaton exists at runtime. To make this possible, the programmer must provide behavior for each \textit{case}, corresponding to elements of the set, one of which will be chosen by \code{determine}. This use case describes a \textit{sum type}, which is already present in rust as the \code{enum}, a union type with a set of \textit{variants}. However, every new variant set would necessitate the definition of a new enum. This is impractical, as the number of combinations are large. Instead, we implement our own types which behave and appear to the user much like \textit{anonymous sum types} (which do not currently exist in the rust language). This is achieved by relying once again on Rust's trait system to encode \textit{lists} in type-space, using nested tuples. \textit{Matching} of these nested tuple types translates to peeling away tuple layers.
+
 \subsection{Governed Environment}
-\subsubsection{Governor Entrypoint}
-words
-\subsubsection{Port Wrappers}
-\section{Feasibility}
-\subsection{RBA Simplification}
+TODO
+
+\section{Making it Practical}
+
+\subsection{Approximating the RBA}
 \subsubsection{Motivation}
-\subsubsection{Consequence: Loss of Distinction}
-\subsection{RBA Preprocessing}
-\subsubsection{Projection and Hiding}
-\subsubsection{Normalization}
-\subsection{Opt-in Simplification}
-\subsection{Match Macros}
+TODO
+
+\subsubsection{Data Domain Collapse}
+% making RBA automata feasible
+\label{sec:approximating_rba}
+The approach to generating a type-state automaton from an RBA was given in~\ref{sec:type_space_automaton}. A major contributor to the size of these state spaces is the size of the data domain. To proceed we abandon the goal of faithfully representing the entirety of the protocol's configuration space in favor of representing an \textit{approximation} by assuming all data types to be the trivial \textit{unit-type}. With this assumption, memory cells may be in one of two states: (a) empty, (b) filled with `unit'. Converting existing RBAs may see large sub-expressions of \textit{data constraints} becoming constant, including checks for equality and inequality between port values. This assumption is justified by its relation to Assumption~\ref{as:1} from Section~\ref{sec:minimizing_bottleneck}. In this context, it can be understood to mean that \textit{usually}, two configurations that are only distinguished by having different \textit{data values} in memory cells or begin put by putters satisfy precisely the same subset of the RBA's guards. Consequently, they do not need to be distinguished. This simplification greatly reduces the total number of types to encode an RBA's configuration space. However, it is still necessary to consider the possible \textit{combinations} of all empty and full memory cells, requiring potentially $2^N$ types for $N$ cells. Rather than enumerating these types explicitly, we can rely on the \textit{structure} the RBA provides by simply encoding each automaton configuration as a \textit{tuple} of types \code{Empty} and \code{Full}. In a sense, each tuple is indeed its own type, but neither the code generator nor the compiler need to pay the price of enumerating all the combinations eagerly. For example, a configuration of three empty memory cells would be represented by type \code{(Empty,Empty,Empty)}.
+
+
+As before, we are able to represent an RBA rule as a \textit{function} in the Rust language by encoding a configuration change from $q$ to $p$ determines its \textit{declaration} such that it consumes the type-state of $p$ and returns the type-state of $q$. The na{\"i}ve approach of generating functions per type-state is susceptible to the same \textit{exponential explosion} that plagued CAs in the first place. Fortunately, tuple-types have inherent structure which Rust's generic type constraints are able to understand. The use of generics to \textit{ignore} elements of the tuple coincides with an RBA's ability not \textit{ignore} memory values. Consequently only one function definition per RBA rule is required. The way the rule's data constraint manifests is somewhat different, as our function must \textit{explicitly} separate the \textit{guard} and \textit{assignment} parts and represent them as constraints on the parameter-type and return-type respectively. As an example, Listing~\ref{listing:fifo_tsa} demonstrates the type definitions and rule functions for the \textit{fifo2} protocol first seen in Section~\ref{sec:semantic_models} with the associated RBA shown in Figure~\ref{fig:fifo2_rba}. Observe that the concrete choices for tuple elements act as \textit{value checks} for memory cells in either empty or full states. Omission of a check must be done explicitly using a \textit{type parameter} such that the function is applicable for either case of \code{Empty} or \code{Full}, and to ensure the \textit{new} state preserves that tuple element; this causes memory cells to have the expected behavior of \textit{propagating} their values into the future unless otherwise overwritten by assignments. This serves as an example of a case where our simplification coincides with a faithful encoding of the original protocol as \textit{fifo2} never discriminates elements of the data domains of $A$ and $B$.
+
+
+\begin{listing}[ht]
+	\inputminted[]{rust}{fifo_tsa.rs}
+	\caption[Type state automaton in Rust for the fifo2 connector.]{Type-state automaton for the \textit{fifo2} protocol in Rust. The three latter functions correspond to the three rules seen for the RBA in Listing~\ref{fig:fifo2_rba}. Function bodies are omitted for brevity.}
+	\label{listing:fifo_tsa}
+\end{listing}
+
+
+
+%For the sake of brevity in sections to come, we introduce a more compact syntax for representing \textit{simplified} RBAs as a list of rules, each of which is:
+%
+%\begin{tabular}{r|rcll}
+%	$index$ & $guard$ & $\rightarrow$ & $assignment$ & $ports$ \\
+%\end{tabular}
+%\\
+%where:
+%\begin{itemize}
+%	\item $index$ is a numeric index to facilitate referring to specific rules in text
+%	\item $guard$ is a string of concatenated symbols $g_0g_1g_2 ...$ from alphabet set \{\texttt{E},\texttt{F},\texttt{.}\} such that $g_i$ \textit{guards} the value of the $i$th memory cell. \texttt{.} is \textit{arbitrary} and thus the memory cell is not checked.
+%	\item $assignment$ is formatted similarly to $guard$, but determines the \textit{assignment} of memory cells in the next time stamp. Here, \texttt{.} \textit{carries over} the value from the guard for that memory cell.
+%	\item $port$ 
+%\end{itemize}
+
+
+
+
+\subsubsection{RBA Projection}
+% removing silent transitions p1
+\label{sec:rba_projection}
+When a protocol's interface is provided as-is to a compute component, its model itself (an RBA in our case) defines precisely what it is permitted to do, just with the \textit{direction} of operations reversed; for the component to be compatible, it must put on port $P$ whenever the protocol gets on $P$, and get on port $Q$ whenever the protocol puts on port $Q$. In such cases, the procedure for encoding the RBA described in Section~\ref{sec:approximating_rba} can be applied directly. Otherwise, the interface of a compute component does not subsume the entirety of the interface of its protocol. In such systems, the protocol interfaces with several compute components. Indeed such cases form the majority in practice; compute components tend to only play a small role in a larger system.
+
+The contents of Section~\ref{sec:approximating_rba} are sufficient to generate some functional governors. We consider a system containing protocol $P$ and connected compute component $C$ with interfaces (port sets) $I_P$ and $I_C$ respectively such that $I_P \supseteq{} I_C$. We wish to generate governor $G_C$ whose task is to ensure that $C$ adheres to $P$. As a first attempt, we translate $P$'s RBA to Rust functions and types as-is. We would quickly notice that the RBA's data constraints represent port-operations that are excluded from $I_C$. These interactions involve no actions on $C$'s part; from the perspectives of $C$ and $G_C$, these actions are \textit{silent}. Equivalently, we do not use the RBA of $P$ directly, but consider instead its \textit{projection} onto $I_C$, which \textit{hides} all actions that are not in the interface projected upon. 
+
+
+\begin{table}
+	\centering
+	\begin{tabular}{l|ll|}
+		rule & guard & assignment \\
+		\hline
+		0 & $m_0=*$ & $\gapwedge{}m_0'=d_A$\\
+		1 & $m_0\neq{}*\gapwedge{}m_1=*$ & $\gapwedge{}m_1'=m_0\gapwedge{}m_0'=*$ \\
+		2 & $m_1\neq{}*$ & $\gapwedge{}d_B=m_1\gapwedge{}m_1'=*$ \\
+		\hline
+	\end{tabular}
+	\caption{RBF of the \textit{fifo2} protocol, equivalent to the RBA in Figure~\ref{fig:fifo2_rba}. Formatted with an outermost disjunct per line such that guard and assignment parts per rule are discernible.}
+	\label{tab:fifo2_rbf_tsa}
+\end{table}
+
+\begin{listing}[ht]
+	\inputminted[]{rust}{fifo_tsa_2.rs}
+	\caption{Type-state automaton rules which govern the behavior of a compute component with interface ports $\{A\}$ for the \textit{fifo2} protocol. Function bodies list the \textit{actions} which the component contributes to the system. Observe that rules but 0 are silent.}
+	\label{listing:fifo_tsa2}
+\end{listing}
+
+As an example, we once again generate a governor for a compute-component with interface $\{A\}$ with the \textit{fifo2} protocol. This time the protocol is represented as an RBF in Table~\ref{tab:fifo2_rbf_tsa} to make the correspondence to the generated governor in Figure~\ref{listing:fifo_tsa2} more apparent. Observe that all but one of its rule functions are \textit{silent}, serving no purpose but to advance the state of the automaton by consuming one type-state and producing the next. As demonstrated here, this approach to generating governors is correct, but has two undesirable properties:
+\begin{enumerate}
+	\item \textbf{API-clutter}\\
+	The end-user is obliged to invoke functions which correspond with rules in the protocol's RBA. In many cases, these rules will serve no purpose other than to consume a type-state parameter, and return its successor.
+	
+	\item \textbf{Protocol Entanglement}\\
+	The type-state automaton captures the structure and rules of the protocol's RBA in great detail. This is a failure to \textit{separate concerns}, which further couples the compute component to its protocol. This has the immediate effect of making components difficult to re-use (their implementations are more protocol-specific), as well as making them brittle to \textit{changes} to the protocol, making them difficult to maintain. 
+	
+\end{enumerate}
+
+\subsubsection{RBA Normalization}
+% removing silent transitions pt 2
+\label{sec:rba_normalization}
+Section~\ref{sec:rba_projection} introduced a procedure for generating governors, but also discussed a significant weakness; all governors are represented by type-state automata based on the original protocol's rules. In this section, we introduce a notion of \textit{normalization} that intends to \textit{specialize} the governors according to its needs such that it is still `compatible' with the protocol's RBA in all ways that matter, but has greatly reduced \textit{api-clutter} and \textit{protocol-entanglement}. 
+
+Let an RBA be in normal form if it has no silent rules. We observe that the presence of silent rules contributes to both api-clutter and protocol entanglement. Ideally, we wish to abstract away the workings of the protocol as much as possible; at all times, the governor only needs to know which actions the component must perform \textit{next}. To make this notion more concrete, we introduce some definitions which build on one another to define the term we need: our normalization procedure should generate an RBA with starting configuration which \textit{port-simulates} the protocol's RBA in its starting configuration:
+\begin{itemize}
+	\item $Act(r)$ of an RBA state $r$:\\
+	The set of ports in $r$ which perform actions (ie: are involved in interactions).
+	
+	\item \textit{Rule sequence} from $c_0$ to $c_1$ of RBA $R$:\\
+	Any sequence of rules in $R$ that can be applied sequentially, starting from configuration $c_0$ and ending in configuration $c_1$.
+	
+	\item \textit{$P$-final} wrt.\ port set $I$:\\
+	A rule sequence of RBA $R$, with \textit{last} rule $r_{last}$ is $P$-final with respect to port set $I$ if $Act(r_{last})\cap{}I=\{P\}$ and for all rules $r$ in the sequence, $r=r_{last} \lor{} Act(r)\cap{}I=\varnothing$.	
+	
+	\item RBA $R_1$ in config.\ $c_1$ \textit{port-simulates} $R_2$ in config.\ $c_2$ wrt.\ Interface $I$:\\
+	If for every $P$-final rule sequence of $R_2$ starting in $c_2$, ending in $c_2'$ there exists some $P$-final rule sequence of $R_1$ starting in $c_1$, ending in $c_1'$ such that $R_1$ in $c_1'$ port-simulates $R_2$ in $c_2'$.
+\end{itemize}
+
+The intuition here is that it does not matter how the governor's RBA structures its rules. It is unnecessary for governors to advance in lockstep with the protocol to the extent that they agree on the protocol's \textit{configuration} at all times. It suffices if the protocol and governor always agree on which \textit{actions} the ports in their shared interface do next. Figure~\ref{fig:path_sim} visualizes this idea; observe how the normalized RBA has entirely different transitions (different labels and configurations), but is ultimately able to pair actions of the protocol for ports in its interface with its own local actions.
+
+\begin{figure}[ht]
+	\centering
+	\footnotesize
+	\begin{tikzpicture}[node distance=2cm, inner sep=0.5mm ]
+	
+	\node[state, initial, initial text=(a)\\\\] (qee) {\code{(E,E)}};
+	\node[state, right of=qee] (qfe) {\code{(F,E)}};
+	\node[state, right of=qfe] (qef) {\code{(E,F)}};
+	\node[state, right of=qef] (qee2) {\code{(E,E)}};
+	\node[state, right of=qee2] (qfe2) {\code{(F,E)}};
+	
+	\node[state, initial, below of=qee, yshift=7mm, initial text=(b)\\\\] (qee') {\code{(E,E)}};
+	\node[state, right of=qee'] (qfe') {\code{(F,E)}};
+	\node[state, right of=qfe'] (qef') {\code{(E,F)}};
+	\node[state, right of=qef'] (qee2') {\code{(E,E)}};
+	\node[state, right of=qee2'] (qfe2') {\code{(F,E)}};
+	
+	\node[state, initial, below of=qee', yshift=7mm, initial text=(c)\\\\] (qee'') {\code{(E,E)}};
+	\node[state, below of=qfe', yshift=7mm] (qfe'') {\code{(F,E)}};
+	\node[state, below of=qfe2', yshift=7mm] (qfe2'') {\code{(F,E)}};
+	
+	\draw
+	(qee) edge[above] node{\code{A.get}} (qfe)
+	(qfe) edge[above] node{$\cdot$} (qef)
+	(qef) edge[above] node{\code{B.put}} (qee2)
+	(qee2) edge[above] node{\code{A.get}} (qfe2)
+	
+	(qee') edge[above] node{\code{A.put}} (qfe')
+	(qfe') edge[above] node{$\cdot$} (qef')
+	(qef') edge[above] node{$\cdot$} (qee2')
+	(qee2') edge[above] node{\code{A.put}} (qfe2')
+	
+	
+	(qee'') edge[above] node{\code{A.put}} (qfe'')
+	(qfe'') edge[above] node[pos=0.9]{\code{A.put}} (qfe2'')
+	;
+	\end{tikzpicture}
+	\caption[RBAs in lockstep with and without normalization.]{Rules being applied to walk three RBAs in lockstep, with time horizontally, showing the (simplified) configurations traversed, and annotating rules by showing which port actions they involve.\\(a) RBA of protocol \textit{fifo2}. (b) RBA of \textit{fifo2} projected onto port set $\{A\}$. (c) RBA of \textit{fifo2} projected onto port set $\{A\}$ and normalized to remove silent rules.}
+	\label{fig:path_sim}
+\end{figure}
+
+
+
+\begin{listing}[ht]
+	\inputminted[]{rust}{normalize.rs}
+	\caption{Normalization procedure, expressed in (simplified) Rust code. In a nutshell: while one exists, an arbitrary silent rule $x$ is removed, and the list of rules is extended with composed rules $x\cdot{}y$ such that $y$ is another rule.}
+	\label{listing:normalize}
+\end{listing}
+
+The final normalization procedure is given in Listing~\ref{listing:normalize} in the form of simplified Rust code. It works intuitively for the most part: silent rules are removed, and new rules are added to retain their contribution of moving the RBA through configuration space. The function \code{normalize} ensures that the returned rule set is in the same configuration as the protocol after matching a non-silent, but the configuration is allowed to `lag behind' while the protocol performs rules which it considers to be silent. New rules must be added to `catch up' to the protocol after any such sequence of silent rules. The procedure does this by building these \textit{composed} rules from front to back, ie. replacing every silent rule $x$ with a \textit{set} of rules $x\cdot{}y$, where $y$ is any other rule. Once completed, the RBA may contain rules that are subject to \textit{simplification}. For example, \{$m=*\wedge{}n=*$, $m\neq{}*\wedge{}n=*$\} can be represented by only $n=*$.
+
+The normalization algorithm is \textbf{correct} as clearly it does not have silent rules once it returns (\code{not\_silent} containing zero silent rules is invariant). Observe that for each silent rule removed, it does not consider composing with \textit{itself}. The immediate result is that the algorithm never inserts some rule $x\cdot{}x$ for silent rule $x$. This is not a problem, as all \textit{silent} rules of our approximated RBAs are \textit{idempotent} with respect to their impact on the configuration. The algorithm is able to take for granted that the result any \textit{chain} of silent rules $x\cdot{}x\cdot{}x\cdot{}...$ is covered by considering $x$ itself. Furthermore, the incremental removal of rules prohibits the creation of any silent cycles at all. This is due to the reasoning above being extended to any sequences also. (TODO PUMPING LEMMA).
+
+
+The normalization algorithm is \textbf{terminating}. It consists of finitely many \textit{algorithm steps} in which the RBA $A$ is replaced by RBA $B=(A \setminus{}\{r\}) \cup{} \{r\cdot{}x | r\in{} A\setminus{}\{x\} \wedge{} composable(x,r)\}$ for some silent rule $x \in{} A$. Initially, $A$ is the input RBA with silent rules. The algorithm terminates, returning $B$ when $A$ is replaced by $B$ where $B$ has no silent rules. Let $P(x)$ be the set of \textit{acyclic paths} through RBA $x$'s configuration space. Observe that initially, $P(A)$ is finite. It suffices to show that in each algorithm round, $|P(A)|$ strictly decreases. Within a round, for every `added' $p$ in $P(B)\setminus{}P(A)$, $p$ contains a rule $m\cdot{}n$ such that there exists $p'$ in $P(A)\setminus{}P(B)$ identical to $p$ but with a 2-long sequence of rules $m, n$ in the place of $x$. From this we know that $|P(A)| \geq |P(B)|$. However, the 1-long path of $x$ itself is clearly in $P(A)\setminus{} P(B)$. Thus, $|P(A)| > |P(B)|$. \textsc{qed}.
+
+To demonstrate the normalization procedure, Table~\ref{tab:fifo2_rbf_tsa_norm} shows the result of projecting the \textit{fifo2} connector's RBF onto port set $\{A,B\}$ and normalizing. The two additional rules can be understood to `cover' the behavior lost as a result of omitting the silent rule 1 from the original~RBF.
+
+
+\begin{table}
+	\centering
+	\begin{tabular}{l|ll|}
+		rule & guard & assignment \\
+		\hline
+		0 & $m_0=*$ & $\gapwedge{}m_0'=d_A$\\
+		2 & $m_1\neq{}*$ & $\gapwedge{}d_B=m_1\gapwedge{}m_1'=*$ \\
+		\hline
+		$1\cdot{}0$ & $m_0\neq{}*\wedge{}m_1=*$ & $\gapwedge{}m_0'=d_A\wedge{}m_1'=m_0$ \\
+		$1\cdot{}2$ & $m_0\neq{}*\wedge{}m_1=*$ & $\gapwedge{}m_0'=*$ \\
+		\hline
+	\end{tabular}
+	\caption{RBF of the \textit{fifo2} protocol, projected onto port set $\{A,B\}$ and normalized. Rules 0 and 2 are retained from Table~\ref{tab:fifo2_rbf_tsa}, and new rules $1\cdot{}0$ and $1\cdot{}2$ are composed of rules from the original RBF.}
+	\label{tab:fifo2_rbf_tsa_norm}
+\end{table}
+
+
+\subsection{Unknown Memory State}
+
+\subsection{Match Syntax}
+(TODO)
+1. compare enum 
+
+
+
+% # solution: high level
+% # functionality
+% # # encoding CA and RBA into types
+% # # rule consensus
+% # # Governed Environment
+% # # # Governor Entrypoint
+% # # # Port Wrappers
+% # feasibility
+% # # RBA simplification
+% # # RBA preprocessing
+% # # # projection
+% # # # normalization
+% # # opt-in simplification
+% # # match macros
+
