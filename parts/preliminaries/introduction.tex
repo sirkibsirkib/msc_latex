@@ -1,1 +1,16 @@
 \chapter{Introduction}
+\hl{these days useful abstractions are everywhere. communications are still relatively primitive: they are solved in a case-by-case basis but there isn't a general approach. 
+the problem is that machines work with actions, and we think in interactions. there are many approaches to representing one with the other. for example, session types allow you to represent actions, and then allow you to predict your PARTNER's actions.
+
+Reo is neat in that its exogenous. it puts the coordination in one place so you extract the protocol from your code. this makes it easier to collect and reason about. you express your protocol in a high-level language and then use that as a specification.  its explicitness makes it very useful for humans, but also for machines; 
+the reo compiler is a tool for generating coordination glue code. the intuition is you abstract away the structure of your network and you no longer distinguish endpoints etc. you instead use PORTS as your interface. the compiler generates the details for you and then it behaves according to the protocol at runtime . 
+
+the reo compiler has support for numerous backends such as java. 
+there are incentives for adding support for systems languages such as C: they represent a large swathe of the possible user space, and their low-levelness means that they can more effectively leverage the information that protocol descriptions provide in the first place.
+
+Rust is a programming language related to C++, intended for a similar audience. aside from the comforts of modern programming languages (closures, generics, functional patterns, extensive macros) it is notable for its unique memory management system: it relies on affine types to statically manage variable bindings, implicitly freeing memory which goes out of scope in a predictible manner. its ownership rules also prevent the majority of data races and protect the programmer from undefined behavior such as accessing uninitialiedd memroy. its UNSAFE sub-language is very similar to C, and can be tapped-into explicitly to achieve optimizations that the compiler cannot prove are safe. Rust is also useful for its exceptionally expressive APIs, as the types themselves allow and require the OWNERSHIP of values to be specified. 
+
+in this work we detail the development of a Rust back-end for the Reo compiler to generate protocol objects which can act as the communication mediums of `compute components'. Chapter BLAH deals with the translation process itself. Chapter blah describes how the generated rust code performs the role of a coordinator at runtime, detailing significant optimizations, particularly focusing on those that take advantage of components co-existing in shared memory. Chapter blah investigates the development of additional tooling for automatically detecting deviations from protocols at compile-time using no extra compilation steps. Chapter BLAH investigates the runtime characteristics of these systems at runtime. Part BLAH reflects on the progress of the project and suggesting directions for future work.
+
+ }
+

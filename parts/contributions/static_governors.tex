@@ -123,13 +123,13 @@ The contents of Section~\ref{sec:approximating_rba} are sufficient to generate s
 		2 & $m_1\neq{}*$ & $\gapwedge{}d_B=m_1\gapwedge{}m_1'=*$ \\
 		\hline
 	\end{tabular}
-	\caption{RBF of the \textit{fifo2} protocol, equivalent to the RBA in Figure~\ref{fig:fifo2_rba}. Formatted with an outermost disjunct per line such that guard and assignment parts per rule are discernible.}
+	\caption[RBF for the fifo2 connector.]{RBF of the \textit{fifo2} protocol, equivalent to the RBA in Figure~\ref{fig:fifo2_rba}. Formatted with an outermost disjunct per line such that guard and assignment parts per rule are discernible.}
 	\label{tab:fifo2_rbf_tsa}
 \end{table}
 
 \begin{listing}[ht]
 	\inputminted[]{rust}{fifo_tsa_2.rs}
-	\caption{Type-state automaton rules which govern the behavior of a compute component with interface ports $\{A\}$ for the \textit{fifo2} protocol. Function bodies list the \textit{actions} which the component contributes to the system. Observe that rules but 0 are silent.}
+	\caption[Type state automaton in Rust with silent rules.]{Type-state automaton rules which govern the behavior of a compute component with interface ports $\{A\}$ for the \textit{fifo2} protocol. Function bodies list the \textit{actions} which the component contributes to the system. Observe that rules but 0 are silent.}
 	\label{listing:fifo_tsa2}
 \end{listing}
 
@@ -210,7 +210,7 @@ The intuition here is that it does not matter how the governor's RBA structures 
 
 \begin{listing}[ht]
 	\inputminted[]{rust}{normalize.rs}
-	\caption{Normalization procedure, expressed in (simplified) Rust code. In a nutshell: while one exists, an arbitrary silent rule $x$ is removed, and the list of rules is extended with composed rules $x\cdot{}y$ such that $y$ is another rule.}
+	\caption[Normalization procedure Rusty-pseudocode.]{Normalization procedure, expressed in (simplified) Rust code. In a nutshell: while one exists, an arbitrary silent rule $x$ is removed, and the list of rules is extended with composed rules $x\cdot{}y$ such that $y$ is another rule.}
 	\label{listing:normalize}
 \end{listing}
 
@@ -236,7 +236,7 @@ To demonstrate the normalization procedure, Table~\ref{tab:fifo2_rbf_tsa_norm} s
 		$1\cdot{}2$ & $m_0\neq{}*\wedge{}m_1=*$ & $\gapwedge{}m_0'=*$ \\
 		\hline
 	\end{tabular}
-	\caption{RBF of the \textit{fifo2} protocol, projected onto port set $\{A,B\}$ and normalized. Rules 0 and 2 are retained from Table~\ref{tab:fifo2_rbf_tsa}, and new rules $1\cdot{}0$ and $1\cdot{}2$ are composed of rules from the original RBF.}
+	\caption[RBF of fifo2 connector, projected and normalized.]{RBF of the \textit{fifo2} protocol, projected onto port set $\{A,B\}$ and normalized. Rules 0 and 2 are retained from Table~\ref{tab:fifo2_rbf_tsa}, and new rules $1\cdot{}0$ and $1\cdot{}2$ are composed of rules from the original RBF.}
 	\label{tab:fifo2_rbf_tsa_norm}
 \end{table}
 

@@ -6,13 +6,15 @@
 \usepackage{xcolor}
 \usepackage{listings}
 \usepackage{xparse}
-	\usepackage{xspace}
+\usepackage{xspace}
 \usepackage{placeins}
 \usepackage[english]{babel}
 \usepackage{amsmath}
 \usepackage{caption}
 \usepackage[T1]{fontenc}
 \usepackage{amsfonts}
+
+
 
 \usepackage{tocloft}
 \setlength{\cftsecindent}{0em}
@@ -23,6 +25,7 @@
 \renewcommand{\cftsecpagefont}{\normalfont\bfseries}% page numbers in bold
 \renewcommand{\cftdotsep}{1}
 \renewcommand{\cftsecleader}{\bfseries\cftdotfill{\cftsecdotsep}}% dot leaders in bold
+
 \usepackage{tikz}
 \usetikzlibrary{automata, positioning, arrows, matrix}
 \tikzset{
@@ -135,7 +138,7 @@
 	\vspace{0.2cm}
 	\small \textit{Submitted in partial fulfillment of the requirements for\\ the degree of Master of Science in\\ Parallel and Distributed Computer Systems.}\par}
 	\vspace{1.5cm}
-	{\Huge\bfseries \rm \textbf{I don't yet know what to call it, lol}\par}
+	{\Huge\bfseries \rm \textbf{Generating Safe and Fast\\ Coordination code in\\ Rust with Reo}\par}
 	\vspace{1.5cm}
 	{\Large\itshape\rm \noindent\textit{Christopher Esterhuyse}\\}
 	\vspace{1mm}
@@ -143,7 +146,7 @@
 	\vfill
 		\rm \noindent \textit{supervisors} \\ \vspace{0.15cm}
 	\begin{tabular}{r@{\hskip 0.4in}l}
-\rm \textbf{Vrije Universiteit Amsterdam} & \textbf{Centrum Wiskunde \& Informatica} \\
+\rm \hspace{3mm} \textbf{Vrije Universiteit Amsterdam} & \textbf{Centrum Wiskunde \& Informatica} \\ 
 dr.\ J.\ \textsc{Endrullis} & dr.\ F.\ \textsc{Arbab}
 \end{tabular}
 \begin{comment}
@@ -155,6 +158,11 @@ dr.\ J.\ \textsc{Endrullis} & dr.\ F.\ \textsc{Arbab}
 	\end{comment}
 	\vfill
 
+\begin{comment} TODO EVENTUALLY
+1. check citations going out of margins
+2. cite extra sources
+3. 
+\end{comment}
 % TODO!! check for everyone's honorifics
 
 % Bottom of the page
@@ -168,11 +176,9 @@ TODO
 \include{parts/preface}
 
 \tableofcontents
-
 \listoffigures
-
-\listoflistings
-\listoftables
+%\listoflistings
+%\listoftables
 
 \newpage
 
@@ -181,16 +187,13 @@ TODO
 \part{Preliminaries}
 \include{parts/preliminaries/introduction}
 \include{parts/preliminaries/background}
-
 \part{Contributions}
 \include{parts/contributions/protocol_translation}
 \include{parts/contributions/protocol_runtime}
 \include{parts/contributions/static_governors}
 \include{parts/contributions/benchmarks}
-
 \part{Reflection}
 \include{parts/reflection/discussion}
-
 
 \bibliographystyle{alpha}
 \bibliography{references}

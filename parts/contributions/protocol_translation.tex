@@ -1,11 +1,15 @@
 \chapter{Protocol Translation}
-\hl{In this section we describe the details that pertain to the process of translating reo connectors from one form to another. the notion of "runtime" becomes less useful when so many different tools are interacting, but this is everything but the runtime of the target application.}
+The Reo compiler has the task of translating a declarative protocol description to its target in some application language: Rust, in our case. In this chapter, we discuss how protocols are represented throughout this process, and how the transformation is achieved. 
 
-\section{Two-Phase Generation}
+\section{Two-Phase Translation}
+The Reo compiler has an internal representation which corresponds closely to RBA, owing to the cheapness of \textit{composition}, as described in Section~\ref{sec:semantic_models}. As such, the majority of the work of the compiler's front-end is unrolling connectors, composing them into a large RBA. Existing back-ends perform the translation from this representation to the target languages directly. As a consequence, the Reo compiler itself contains a significant amount of \textit{language specific} details. For example, ports with unspecified types are represented with \textit{Object}, owing to this being a natural choice for Java. In this work, we introduce a new intermediate representation to ease the transition from the relational RBA form to the target language. As the name suggests, \textit{imperative form} aims to represent rules each as a sequence of imperative actions without including any specifics that tie it to any imperative language in particular. Next, we discuss the translation of this intermediate form to Rust in particular, and how the specifics of this process manifest. 
 \hl{In previous works, reo generates the target code directly. }
 
 \subsection{Motivation}
-
+\begin{enumerate}
+\item Removes work from the Reo back-end
+\item 
+\end{enumerate}
 \hl{Reo's Java back-end generates t}
 
 \subsection{Imperative Form}
