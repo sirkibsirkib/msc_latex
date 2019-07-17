@@ -1,5 +1,9 @@
 \chapter{Discussion}
 \section{Future Work}
+\subsection{Imperative Form Compiler}
+\hl{we use an interpreter. previously, we mention our reasons for doing so. in other circumstances, the overhead of the interpretation may be undesirable. other language targets may be supported by instead again pre-processing imperative form to generate tailor-made target code as the Java back-end does today.}
 \subsection{Distributed Components}
+\subsection{Imperative Branching}
+\hl{as propositional formulas can be converted to DNF (with disjunctions on the outermost layer), so too can imperative form rules be split over OR branches into new rules (EXAMPLE). This idea can be taken to the extreme: splitting over the elements of the data domain and once again enumerating the transition space, resulting in something with the most degenerate RBAs possible with an explosion in rules. In some cases, moving in this direction is desirable, as it has the effect of making the rule GUARDS do all of the checking; as seen earlier, boolean guarded variables can be efficiently checked in bulk. THe extreme of the spectrum is unlikely to be more efficient: the same transform values will be computed and discarded repeatedly, and as the number of boolean variables increases, at some point even batch-computing them falls behind. Future work could investigate this balance between a small number of rules, and determinisms in rules.}
 \subsection{Runtime Governors}
 \section{Conclusion}

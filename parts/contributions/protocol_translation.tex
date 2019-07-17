@@ -1,72 +1,67 @@
-\chapter{Protocol Translation}
-The Reo compiler has the task of translating a declarative protocol description to its target in some application language: Rust, in our case. In this chapter, we discuss how protocols are represented throughout this process, and how the transformation is achieved. 
+\chapter{Imperative Form}
+In this work we introduce another representation of Reo protocols intended to ease the transition from the Reo compiler's internal representation to generated code in some target imperative language. In this chapter, we describe and exemplify this imperative form and describe the processes of translating to and from this new representation. 
 
-\section{Two-Phase Translation}
-The Reo compiler has an internal representation which corresponds closely to RBA, owing to the cheapness of \textit{composition}, as described in Section~\ref{sec:semantic_models}. As such, the majority of the work of the compiler's front-end is unrolling connectors, composing them into a large RBA. Existing back-ends perform the translation from this representation to the target languages directly. As a consequence, the Reo compiler itself contains a significant amount of \textit{language specific} details. For example, ports with unspecified types are represented with \textit{Object}, owing to this being a natural choice for Java. In this work, we introduce a new intermediate representation to ease the transition from the relational RBA form to the target language. As the name suggests, \textit{imperative form} aims to represent rules each as a sequence of imperative actions without including any specifics that tie it to any imperative language in particular. Next, we discuss the translation of this intermediate form to Rust in particular, and how the specifics of this process manifest. 
-\hl{In previous works, reo generates the target code directly. }
 
-\subsection{Motivation}
+\section{Motivation}
+
+\section{Role in the Reo Pipeline}
+Reo is a declarative language that describes constraints as relations. This is a sensible choice because it provides an intuitive language for representing \textit{interactions} as synchronous events, but also because this form lends itself well to the \textit{composition} which the compiler must perform while unrolling specifications into their constituent connectors. When used to generate coordination glue code imperative languages, these high-level abstractions must at some point be decomposed into \textit{actions} of individual participants. Currently, this translation is performed in the Reo compiler's back-end. This is no simple task, and so the compiler leverages many tools such as \textit{string template generators} to make the implementation more transparent and robust. Still, this approach has some undesirable consequences: (1)~The Reo compiler itself becomes entangled with the syntax of all of its target languages; changes to target languages necessitate that it also be maintained to catch up. (2)~Even template generators cannot fully abstract away the syntactic minutia of the target language; this can obfuscate implementation errors\footnote{For example, the Java compiler contained a bug which resulted in swapped memory values as a result of generated code performing memory assignments in the wrong order. These errors are difficult to catch just by looking at the templates.}. Rust in particular requires a significant amount of work to represent these rule firings, owing to its unique requirements for the user to take care that any variable bindings are \textit{consumed} or \textit{mutated} for the program to compile. While these concerns are unique to Rust, other languages will have concerns of their own. However, imperative languages (as the name suggests) have in common their expression of computation in terms of sequences of stateful operations. The set of actions comprising an interaction must thus be laid out with respect to run time, taking care only to operate on values in scope (Eg.\ certainly \textit{after} the variables are declared). 
+
+The Reo compiler is also prepared to represent arbitrary \textit{function calls} as part of the data constraints. Subtleties in the details of how these are declared have important implications on how these calls must be performed in an imperative setting. Consider a data constraint $f(P_0)=f(P_1)=C$, where~$P_0$ and~$P_1$ are \textit{putters} (their ports are oriented to send data \textit{into} the protocol or to peers), and $C$ is a getter. Recall that the data constraints in an RBA are interpreted as `allowed' synchronous observations of data. The protocol cannot control the values submitted by the putters,  but it \textit{can} (and does) control the value received by getters. In this view, such rules can be understood decomposed into \textit{guards} and \textit{assignments}, the former of which will be checked at runtime, and if satisfied, the latter will be performed. This case is interesting because the results of $f$ are part of both the guard and the assignment; the rule does not fire unless $f(P_0)=f(P_1)$, but if it does, $C$ is sent this value. This leads to an interesting conundrum: the value resulting from the execution of~$f(P_0)$ and ~$f(P_1)$ are only needed based on a decision which is a function of~$f(P_0)$ and ~$f(P_1)$; ideally; when the output is such that the rule is not fired, an outside observer should consider $f$ never to be executed at all. Of course this is impossible for arbitrary $f$. Instead, imperative form covers these cases by adopting semantics similar to that of \textit{transactions}.
+
+Imperative form has rules, each of which corresponds to an interaction (as with RBAs). Each rule consists of a sequence of actions that, when executed to completion, are observed to perform the interaction. However, these actions are partitioned such that there is a moment where the rule can be considered to \textit{commit}. Once committed, any action performed guarantees all actions will be performed. On the other hand, actions \textit{prior} to commitment must be \textit{reversible} such that they can be \textit{rolled back}. This necessitates that no observable behavior be emitted prior to commitment.
+
+\section{Imperative Form Definition}
+\label{sec:imperative_form_definition}
+A protocol in imperative form is a set of rules, each of which corresponds to a conditional interaction much like with RBAs. They are structured around the management of \textit{resources}, so called not to be confused with `variables' (which represent persistent memory slots in protocol objects). A resource is some initialized data item that is \textit{available} at a moment in time. Memory cells which are filled are thus also resources. Concretely, an imperative rule is a tuple $(P, I, M)$ with:
 \begin{enumerate}
-\item Removes work from the Reo back-end
-\item 
+	\item \textbf{Premise $P$}\\
+	A tuple of three \textit{identifier} sets $(P_R, P_F, P_E)$. Set $P_R$ contains the \textit{synchronization constraint} identical to that of RBAs, referring to the set of ports that `fire'. In the context of a premise, this set describes which ports must be \textit{ready}. $P_F$ and $P_E$ are the sets of \textit{memory variables} which must be known to be full and empty respectively. By definition, any pair of these sets must have an empty intersection. The rule can certainly not consider firing unless all ports are ready and all memory cells are in the specified states. Omitting a port or memory cell represents \textit{undefined state}, and thus is not considered an accessible resource.
+	
+	\item \textbf{Instructions $I$}\\
+	A list of reversible \textit{instructions} which are performed in sequence. These instructions can manipulate resources. As they are tentative, it is also possible to trigger a rollback. Concretely, each instruction is one of:
+	\begin{itemize}
+		\item $check(p)$\\
+		Trigger a rollback if predicate $p$ over data is satisfied.
+		\item $fill_P(m, p)$\\Fill an empty memory variable $m$ with the result of a predicate $p$ over available data.
+		\item $fill_F(f, a)$\\
+		Fill an empty memory variable $m$ with the result of invoking function $f$ with parameters $a$, a list of references to data variables with length matching the arity of $f$. It is incorrect for $f$ to \textit{mutate} its arguments, as this would result in observable effects which cannot be rolled back.
+		\item $swap(m_0,m_1)$\\
+		Swap the values in two memory variables~$m_0$ and~$m_1$; in principle, any reversible data-agnostic manipulation is possible, but swapping values is sufficiently expressive.
+	\end{itemize}
+	If a rollback is triggered by $check$, any swapped memory cells are swapped back, and any memory cells whose values were created by $fill_P$ or $fill_F$ are destroyed.
+
+	\item \textbf{Movements $M$}\\
+	A mapping from \textit{resources} to any identifiers that can act as getters (getter ports and empty memory cells). This represents the \textit{observable effects} of the rule firing after instructions are performed without triggering rollback. 
 \end{enumerate}
-\hl{Reo's Java back-end generates t}
 
-\subsection{Imperative Form}
-\hl{In this work, we introduce a new intermediate representation for the reo compiler, which we will refer to as \textit{imperative form}. based on what can be described in an RBA. }
+As an example to demonstrate this representation, the RBA rule in the previous section with data constraint $f(P_0)=f(P_1)=C$
+ and synchronization constraint $\{P_0, P_1, C\}$ will be represented in the imperative-form rule with guard $P=(\{P_0, P_1, C\}, \{\}, \{t_0,t_1\})$, instruction list $I=[\text{\textbf{fill:}}t_0=f(P_0), \text{\textbf{fill:}}t_1=f(P_1), \text{\textbf{check:}}t_0=t_1]$, and with movements $\{t_0\rightarrow\{C\}\})$. The explicit use of instructions to fill and check the values of temporary variables $t_0$ and $t_1$
 
-\subsubsection{Data Actions}
-\hl{we implement synchronous interactions as a sequence of actions. this takes some care, as this translation gets hairy. eg: overwriting memory in the correct order. }
+\section{From Reo to Imperative Form}
+This section details the procedure by which the Reo compiler transforms its internal representation to imperative form. Currently, this only occurs when Rust is chosen as the target language. As such, the current syntax for the imperative form is in Rust syntax, but otherwise corresponds closely to its description in the previous section.
 
-\subsubsection{Rules as Transactions}
-\hl{
-The Reo compiler has support for the TRANSFORM channel, which essentially allows the invocation of arbitrary functions in the circuit. eg $A=f(B)$ this gets complicated because these operations can be used in guards, assignments or both (as in $A=f(B)=m'$) the counter-intuitive thing is that the value must be computed to decide IF the rule may fire, yet we don't want the value if it does not. 
-Instead, we model rule firings as TRANSACTIONS which can be rolled back. for every rule the last chance to roll back must precent the first VISIBLE EFFECT. 
+\subsection{Compiler Internal Representation}
+Internally, the Reo compiler represents connectors very similarly to RBAs. The two most significant differences are (1) the compiler collects annotations in the textual reo specification for the initial values of memory cells, if any are provided. (2) the \textit{term} assigned to each getter-port and empty memory cell are identified and associated with the appropriate identifiers. At this stage, the behavior of the compiler is \textit{specialized} according to the chosen target language. Concretely, the starting point for our back-end is a large \textit{protocol} declaration object, consisting of (1) the `interface', with port identifiers and whether they are putters or getters, (2) identifiers for memory variables and optionally a string representing their initial value, (3) a set of rules. Each of these rules, in turn, has (1) a representation of the logical guard, (2) the synchronization constraint, and (3) a partial mapping from identifiers to their assigned term.
 
-we support this functionality with INSTRUCTIONS which are performed in sequence. these instructions can perform operations on data, such as creation of new elements, and it may trigger a ROLLBACK
-}
-
-\section{Code Generation}
-
-\subsection{Reo Side}
-\hl{we discuss the task of translating a declarative reo description into imperative form }
-
-\subsubsection{Compiler Internal Representation}
-\hl{compiler internal repr. is very similar to RBA with some extra information such as the direction of ports. some information is provided, such as figuring out the ASSIGNMENT to ports and memory cells}
-
-\subsubsection{Group by Resource}
-\hl{primarily want to find the mapping from putter to getters. this follows the FLOW of the DATA. ultimately we need}
-
-\subsubsection{Type Constraining}
-\hl{once the flow has been determined, we can see which operations must be supported on the target thing: mostly equality and clone operations. we wish to generate GENERIC protocols. so this requires TYPE CLUSTERNG and CONSTRAINING}
-
-\subsection{Rust Side}
-\hl{
-imperative form is still too high-level to be used directly. what happens next is very language specific, and can be approached many ways. the section to follow explains how the final transformed rust works at runtime. Here, we concentrate only on getting it into that form.
-}
-
-\subsubsection{Runtime Interpreter}
-\hl{many approaches are possible for translating the imperative form. in this work we go with an approach that is relatively abstract by implementing a lightweight INTERPRETER that is essentially instantiated with a small program that corresponds strongly with the abstract interpretive form. 
-	This was done for several reasons: 
-	1. extensive virtualization
-	2. pushes protocol instantiation later into the instantiation process so more decisions can be made at the last moment
-	3. represents more stuff as DATA relying less on monomorphization from generic types (as is the usual rust idiom), which makes it more inter-operable with C
-	4. a data-oriented representation is more friendly to FFI. 
-	5. runtime configuration}
-
-\subsubsection{Checking and Errors}
-\hl{Assuming that they are described using conventional data structures (sets, maps, lists, etc.) rba rules can be malformed. for example, checking a value not in the firiing set. As  Imperative form orients its description according to TIME and not VALUE, the operations on the same values are decoupled and spread out, creating many new possibiltiies of ill-formed operations. for example, moving a value that is only constructed later. These problems are familiar to sequential programming, as expected. the parallel is trying to manipulate a variable out of scope. etc.
-To complement the throughline of "separating concerns", building a protocol object can FAIL, returning error. some failures are necessary for the build phase (eg: the builder does not know how to represent the movement of a value that has not been defined, as it does now know its data type), and other checks can result in sensible protocol objects but which would do something INVALID at runtime. for example, it would be possible to represent the consumption of a value whose name is in scope, but known to be EMPTY, but it would result in reading uninitialized memory at runtime.
-}
+\subsection{Action Sequencing}
+\hl{TODO}
 
 
+\subsection{Type Clustering}
+\hl{TODO}
 
-\subsubsection{Optimization}
-\hl{the INNER form of the rust protocol objects are indeed translated into a still more-complicated form for the purposes of optimization:
-1. uses representations which are less convenient to use, but run more efficiently for their intended purpose (eg fusing port and memory readiness as they are usually checked togehter)
-2. assumes that it is WELL FORMED to save the time that would be spent checking (eg: it can assume that a putter and getter expect the same data type. If it knows one, it does not need to look up the other)
-}
+\section{From Imperative From to Rust}
+This section discusses how a finished \textit{protocol object} is extracted from the imperative form representation. The characteristics of these objects are discussed in depth in Chapter~\ref{sec:protocol_runtime} to follow. Here, it suffices to say that the Rust runtime representation is very similar to the imperative form.
+
+\subsection{Soundness Checks}
+In a sense, a language is `declarative' by expressing their values (or their computations) while intentionally omitting the control flow that performs the work. On the other hand, `imperative' languages are characterized by doing the opposite; they make explicit the control flow of a program, and thus the values for bindings at a moment in time is a derived concept. Imperative form appropriately decouples values from their contents, exposing a larger surface for creating ill-formed rules. For example, it is incorrect to express a rule which will fill a memory variable if that variable may already be filled; this would manifest as \textit{overwriting} data at runtime. To aid with isolating the development of the Reo back-end from the Rust library, checks are performed to ensure that the input data structure can be interpreted as a well-formed protocol in imperative form. 
+
+One of Rust's most unique features is its static \textit{borrow checker}, which has the task of emitting errors if it cannot determine, based on the header and body of a function alone, that all operations within the function adhere to Rust's \textit{ownership rules}. These are described in more detail in Section~\ref{sec:rust_language}. The borrow checker is limited to checking \textit{actions} within the current function, and has no concept of interactions. As such, implementing interaction primitives necessitates delving into \textit{unsafe Rust} for actions which are unsafe when viewed in isolation. For example, it is unsafe to return type $T$ acquired by dereferencing a pointer acquired through a message channel; whether the pointer is valid or whether the memory is initialized cannot be known. The Rust borrow checker is therefore unable to assist in ensuring that the data operations performed by \textit{instructions} are safe. Instead, the translation procedure mimics the borrow checker. The reasoning is idiomatic for the affine language, following the control flow of each rule and keeping track of which resources are \textit{available}. Instructions which would overwrite possibly initialized resources, or read from possibly uninitialized resources are \textit{rejected} with appropriate error messages specifying the line number and the name of the variable in question. 
+
+Rust is not a memory-managed language. Instead, the ownership system keeps track of variables and inserts predictable de-allocation calls if they go out of scope before being consumed. Clearly it is incorrect for an imperative rule's \textit{movement} to include a mapping for a resource which is not available. 
+To mimic the borrow checker, it would be wise to reject inputs for rules which leave resources unmapped, as this could be understood as \textit{leaking} memory. Instead, we insert trivial mappings for resources which must be freed but are not consumed, as the borrow checker would; ie.\ mappings are inserted to empty sets of identifiers. With this modification, the Rust runtime can rely on the set of mapped resources exactly corresponding to the resources which the rule's firing consumes.
 
 
-\subsection{Function Calls}
-\hl{Reo and RBAs in general support syntax for the TRANSFORM channel. these channels are particularly interesting because they blur the line between coordination and computation. in Reo, transform channels are intuitive: they output something which is a transformation of their input. done asynchronously, it is very clear to see how this would work. Unfortunately, Reo is synchronous which creates an interesting problem. Here, we see an instance of it in an RBA constraint: $f(P_0)=f(P_1)=C$. Let $P_0$ and $P_1$ be producers (they output into the protocol), and $C$ is a consumer, and $f$ is some unary function. This formulation has an interesting interpretation in the imperative realm: $C$ gets some datum that is computed using $f$, but \textit{only} if $f(P_0)=f(P_1)$. As $f$ is some arbitrary function, we must invoke $f$ before we know whether the result should be observed by $C$. }
+\subsection{Initialized Memory}
+\subsection{Preprocessing}

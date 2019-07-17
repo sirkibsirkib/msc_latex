@@ -247,6 +247,7 @@ ret
 Type systems exist for the sole purpose of constraining which programs can be built, and do not add any expressiveness in terms of what can be computed. However, we know that adding (sensible) restrictions provides us other important properties. By constraining ourselves in some part, we drastically increase the number of properties that other parts are safe to assume. Affine types are a type system that applies this reasoning to explicitly managing access to variables, thus, allowing us to statically reason about resource management in a more fine-grained way. 
 
 \subsection{The Rust Programming Language}
+\label{sec:rust_language}
 introduce Drop, Move, Clone, Copy
 
 Aside from some unusual exceptions\footnote{TODO pinned objects}, all values in rust can be \textit{moved}, which describes a \textit{value} being transferred between variable bindings, or into functions as arguments, as demonstrated in Listing~\ref{listing:move}. Clearly, the Rust compiler tracks which values have been moved. Aside from preserving affine properties, this is necessary for determining when a value should be \textit{dropped}. \code{drop} is the \textit{destructor} function invoked by the compiler on a type when its binding goes out of scope and it has not been moved. 
