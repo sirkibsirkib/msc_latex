@@ -1,5 +1,6 @@
 \chapter{Protocol Runtime}
 \label{sec:protocol_runtime}
+In this section we explore the Rust implementation of Reo-generated protocol objects. Rather that generating the needed structures and behaviour from scratch each time, the Rust back-end follows the precedent of the well-established Java back-end and relies on a single, re-usable dependency for the work common to all protocols. Here, we explore the implementation of this \textbf{Reo-rs} library, picking up where we left off from the generation step in Chapter~\ref{sec:imperative_form} above.
 
 \section{Examining the Java Implementation}
 \label{sec:java_examined}
@@ -78,25 +79,35 @@ It is very easy to see the correspondence between a generated Java protocol and 
 
 \section{Design Goals Defined}
 \label{sec:design_goals}
-The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. Below, the design goals of the Rust code generator are enumerated a list of \textit{deviations} from the standard set by the Java version. Each goal is given a name such that it can be referred to in Sections~\ref{sec:reo_to_rust}~to~\ref{sec:design_goals_evaluated} to follow.
+%The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. Below, the design goals of the Rust code generator are enumerated a list of \textit{deviations} from the standard set by the Java version. Each goal is given a name such that it can be referred to in Sections~\ref{sec:reo_to_rust}~to~\ref{sec:design_goals_evaluated} to follow.
+%
+%
+%\begin{enumerate}
+%	\item[$G_1$] Prohibit aliasing where it would result in behavior disallowed by Reo's value-passing semantics.
+%	\item[$G_2$] Relax the requirement of port-data to be heap-allocated.
+%	\item[$G_3$] Minimize the number of times values with large on-stack representations must be moved.
+%	\item[$G_4$] Minimize the overhead experienced as a result of protocol components repeatedly evaluating arbitrarily expensive guards.
+%	\item[$G_5$] Enforce that ports be acted upon by two components: one acting as producer, and the other acting as consumer.
+%	\item[$G_6$] Protect the end user from being able to run protocols with uninitialized or fused ports.
+%	\item[$G_7$] Facilitate termination detection as defined by all \textit{non-protocol} components exiting.
+%\end{enumerate}
+%
+%
+%\section{Goals}
 
+The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. In this section, we lay out the requirements for Reo-rs.
+
+\subsection{Functional Requirements}
+First and foremost, we define the requirements on \textit{what} Reo-rs must do. These are the most significant requirements concentrating on functionality that empowers the end user, and safety that protects them.
 
 \begin{enumerate}
-	\item[$G_1$] Prohibit aliasing where it would result in behavior disallowed by Reo's value-passing semantics.
-	\item[$G_2$] Relax the requirement of port-data to be heap-allocated.
-	\item[$G_3$] Minimize the number of times values with large on-stack representations must be moved.
-	\item[$G_4$] Minimize the overhead experienced as a result of protocol components repeatedly evaluating arbitrarily expensive guards.
-	\item[$G_5$] Enforce that ports be acted upon by two components: one acting as producer, and the other acting as consumer.
-	\item[$G_6$] Protect the end user from being able to run protocols with uninitialized or fused ports.
-	\item[$G_7$] Facilitate termination detection as defined by all \textit{non-protocol} components exiting.
+	\item[$\boldsymbol{F_{value}}$] TODO.
+	\item[$\boldsymbol{F_{build}}$] TODO.
 \end{enumerate}
 
-
-\section{Goals}
-\subsection{Functional Requirements}
 features, safety
-\subsubsection{Features}
-\subsubsection{Safety}
+%\subsubsection{Features}
+%\subsubsection{Safety}
 \subsection{Non-Functional Requirements}
 performance, maintainability
 \section{Runtime Properties}

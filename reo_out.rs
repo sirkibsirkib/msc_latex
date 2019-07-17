@@ -1,4 +1,4 @@
-pub fn def_async_transform<T>(f: fn(&T)->T) -> Proto {
+fn def_async_transform<T>(f: fn(&T)->T) -> Proto {
     ProtoDef {
         name_defs: {
             "A"   => Port(Putter, T),

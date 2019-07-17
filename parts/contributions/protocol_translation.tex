@@ -1,4 +1,5 @@
 \chapter{Imperative Form}
+\label{sec:imperative_form}
 In this work we introduce another representation of Reo protocols intended to ease the transition from the Reo compiler's internal representation to generated code in some target imperative language. In this chapter, we describe and exemplify this imperative form and describe the processes of translating to and from this new representation. 
 
 
@@ -56,20 +57,20 @@ Observe that the definition of imperative form from Section~\ref{sec:imperative_
 
 Reo makes it possible to express protocols with a mix of generic and specific types. Ultimately, this allows for the creation of protocol descriptions for data types that are only determined \textit{after} being emitted by the Reo compiler, but does not necessarily require it. Indeed, there are cases where it is desirable to be specific. For example, protocols may want to specify the type of internal memory cells to be \textit{unit}, as they are used to encode state, but never store any user-facing data. 
 
-To meet these needs, Reo generates Rust source which contains a \textit{generic function} which returns an imperative-form protocol description. The instantiation of the generic arguments determine the types and the initialized memory in the context of being \textit{invoked} by code elsewhere. Section~\ref{sec:rust_language} provides more details on how Rust represents these generic arguments. Listing~\ref{listing:reo_out} gives an example of what Reo generates as output given a connector which \textit{asynchronously} forwards some generic type \code{T} from $A$ to $B$, where $B$ receives the value transformed by some unspecified function~\code{f}. Note that the result of this function is not the protocol definition, but rather the \textit{instantiated} protocol object itself. This is clearly not the only use for such a structure. Listing~\ref{listing:reo_out2} gives another example of a use for an imperative form generated in Rust. This is \textit{not} currently done by the Reo compiler, but serves to illustrate what is trivially possible; here, \code{lazy\_static} declares an immutable resource which is lazily initialized across threads such that it can be repeatedly built by reference using \code{\&MY\_PROTO}. This protocol illustrates the example from Section~\ref{sec:imperative_form_definition} where $f$ is fixed as a function incrementing its integer input by one. It demonstrates how a value computed from an arbitrary function can be incorporated into \textit{both} the guard and assignment of one rule.
+To meet these needs, Reo generates Rust source which contains a \textit{generic function} which returns an imperative-form protocol description. The instantiation of the generic arguments determine the types and the initialized memory in the context of being \textit{invoked} by code elsewhere. Section~\ref{sec:rust_language} provides more details on how Rust represents these generic arguments. Listing~\ref{listing:reo_out} gives an example of what Reo generates as output given a connector which \textit{asynchronously} forwards some generic type \code{T} from $A$ to $B$, where $B$ receives the value transformed by some unspecified function~\code{f}. Note that the result of this function is not the protocol definition, but rather the \textit{instantiated} protocol object itself. This is clearly not the only use for such a structure. Listing~\ref{listing:reo_out2} gives another example of a use for an imperative form generated in Rust. This is \textit{not} currently done by the Reo compiler, but serves to illustrate what is trivially possible; here, \code{lazy\_static} declares an immutable resource which is lazily initialized across threads such that it can be repeatedly built by reference using \code{\&MY\_PROTO}. This protocol illustrates the example from Section~\ref{sec:imperative_form_definition} where $f$ is fixed as a function which returns the modulus of the input with 3. It demonstrates how a value computed from an arbitrary function can be incorporated into \textit{both} the guard and assignment of one rule.
 
 
 \begin{listing}[ht]
 	\centering
-	\inputminted[]{rust}{reo_out.rs}
-	\caption[TODO]{TODO.}
+	\inputminted{rust}{reo_out.rs}
+	\caption[Example of Reo compiler output to imperative form in Rust.]{Output out the Reo compiler with the Rust language target for an input connector which asynchronously forwards some generic data-type \code{T} from $A$ to $B$ through a transform function $f$. \code{T} and $f$ are chosen by the user whenever \code{def\_async\_transform} is invoked, constructing a new  \textit{runnable} Rust protocol object with the \code{build} method. The syntax has been abbreviated slightly for readability, but is otherwise faithful.}
 	\label{listing:reo_out}
 \end{listing}
 
 \begin{listing}[ht]
 \centering
-\inputminted[]{rust}{reo_out2.rs}
-\caption[TODO]{TODO.}
+\inputminted{rust}{reo_out2.rs}
+\caption[TODO]{Example of another use for the imperative form structure in the Rust language. Here, \code{\&MY\_PROTO} accesses the imperative form by reference such that it can instantiate runnable protocol objects repeatedly. Syntax is slightly abbreviated for readability. This protocol forwards $modulo(P_0,3)$ to $C$ only if it is equivalent to $modulo(P_1,3)$.}
 \label{listing:reo_out2}
 \end{listing}
 
@@ -77,7 +78,7 @@ To meet these needs, Reo generates Rust source which contains a \textit{generic 
 TODO
 
 \section{From Imperative From to Rust}
-This section discusses how a finished \textit{protocol object} is extracted from the imperative form representation. 
+This section discusses how a finished \textit{protocol object} is extracted from the imperative form representation in the~\code{build} method. 
 Rather than being performed by code generated for every particular protocol, this operation is provided in a dependency to the \textbf{Reo-rs} library. The details of this contribution are discussed in depth in Chapter~\ref{sec:protocol_runtime} to follow. Here, it suffices to say that the library's representation is very similar to the imperative form.
 
 \subsection{Soundness Checks}
@@ -86,9 +87,9 @@ In a sense, a language is `declarative' by expressing their values (or their com
 One of Rust's most unique features is its static \textit{borrow checker}, which has the task of emitting errors if it cannot determine, based on the header and body of a function alone, that all operations within the function adhere to Rust's \textit{ownership rules}. These are described in more detail in Section~\ref{sec:rust_language}. The borrow checker is limited to checking \textit{actions} within the current function, and has no concept of interactions between concurrent threads. As such, implementing interaction primitives necessitates delving into \textit{unsafe Rust} for actions which are unsafe when viewed in isolation. For example, it is unsafe to return type $T$ acquired by dereferencing a pointer to $T$ acquired through a message channel; whether the pointer is valid or whether the memory is initialized cannot be known. The Rust borrow checker is therefore unable to assist in ensuring that the data operations performed by our imperative instructions are safe. Instead, our translation procedure mimics the borrow checker. The reasoning is idiomatic for the affine language, following the control flow of each rule and keeping track of which resources are \textit{available}. Instructions which would overwrite possibly initialized resources, or read from possibly uninitialized resources are \textit{rejected} with appropriate error messages specifying the line number and the name of the variable in question. 
 
 Rust is not a memory-managed language. Instead, the ownership system keeps track of variables and inserts predictable de-allocation calls if they go out of scope before being consumed. For this reason, types must be annotated with their \textit{ownership}, distinguishing references by whether their values are \textit{logically} transferred to the scopt of the function. Clearly it is incorrect for an imperative rule's \textit{movement} to include a mapping for a resource which is not available. 
-To mimic the borrow checker, it would be wise for the library to reject inputs for rules which leave resources unmapped; if left unchecked, this would result in leaking memory at runtime. To achieve the same result more ergonomically, Reo-rs opts to insert trivial movement-mappings for resources which must be freed but are not consumed, as the borrow checker would; ie.\ unconsumed resources \textit{move} to the locations of an empty set of recipient identifiers. With this modification, the Rust runtime can rely on the set of mapped resources exactly corresponding to those consumed as the result of the rule's firing.
-
-\subsection{Initialized Memory}
-As with RBAs, imperative form only describes the behavior of the protocol in terms of rules, and not the state in which it is initialized. This is a pragmatic choice, as usually the initialization of the values for memory cells is particular to the data type of the value. How values are initialized is 
+To mimic the borrow checker, it would be wise for the library to reject inputs for rules which leave resources unmapped; if left unchecked, this would result in leaking memory at runtime. To achieve the same result more ergonomically, Reo-rs opts to insert trivial movement-mappings for resources which must be freed but are not consumed, as the borrow checker would; ie.\ unconsumed resources \textit{move} to the locations of an empty set of recipient identifiers. With this modification, the Rust runtime can rely on the set of mapped resources exactly corresponding to those consumed as the result of the rule's firing. 
 
 \subsection{Preprocessing}
+Reo specifications include a lot of informations about what is expected of the protocol's observable behavior. That is indeed the point. By relying on \code{build} being the only publically-accessible means of constructing runnable protocol objects, checking well-formedness can be front-loaded to \code{build} such that they can be safely presumed to hold at runtime. 
+
+Along with the initial values for memory cells, \code{build} is responsible for setting up the state of the runnable protocol object which is needed for it to function. Conceptually, protocol state is limited to the contents of memory cells (and perhaps, a flag or \code{Option} representation for distinguishing \textit{full} from \textit{empty}). In practice, the coordination of threads requires some additional data structures that exist for guaranteeing mutual exclusion, helping threads find one another, and channels for inter-thread communication. These primitives are all constructed at the end of \code{build}, invisibly to the user. Chapter~\ref{sec:protocol_runtime} to follow goes into detail about what happens next.

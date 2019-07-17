@@ -4,7 +4,7 @@ lazy_static! {
             "P0"   => Port(Putter, u32),
             "P1"   => Port(Putter, u32),
             "C"    => Port(Getter, u32),
-            "f"    => Func(FuncHandle::new(|x: *const u32| *x + 1)),
+            "f"    => Func(FuncHandle::new(|x: *const u32| *x%3 ),
         },
         rules: [
             RuleDef {
