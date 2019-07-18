@@ -38,16 +38,16 @@ In addition to re-using nodes inside a connector, connectors are able to expose 
 (In the context of applications, components that cannot be composed compile to things managed by different threads. at the boundaries, they communicate with ports. Here, there is a meaningful difference between putter and getter. Include example of how a protocol that uses some port A three times still results in a putter-getter pair)
 
 
-\subsection{Typical Channels}
-
-In principle, Reo does not enforce the use of any primitive channels in particular. Users are free to use channels that are best-suited to their use case. In practice, a small set of exceptionally simple channels are favoured in literature and in practice owing to their versatility. As such, this work presumes that these consititute the majority of the channels out of which our protocols are composed. Below, we enumerate this set of channels and their behavior.
-
-\begin{enumerate}
-	\item sync($I_0, O_0$)
-	\item fifo1($I_0, O_0$)
-	\item lossy\_sync($I_0, O_0$)
-	\item exclusive\_router($I_0, O_0, O_1$)
-\end{enumerate}
+%\subsection{Typical Channels}
+%
+%In principle, Reo does not enforce the use of any primitive channels in particular. Users are free to use channels that are best-suited to their use case. In practice, a small set of exceptionally simple channels are favoured in literature and in practice owing to their versatility. As such, this work presumes that these consititute the majority of the channels out of which our protocols are composed. Below, we enumerate this set of channels and their behavior.
+%
+%\begin{enumerate}
+%	\item sync($I_0, O_0$)
+%	\item fifo1($I_0, O_0$)
+%	\item lossy\_sync($I_0, O_0$)
+%	\item exclusive\_router($I_0, O_0, O_1$)
+%\end{enumerate}
 
 
 \subsection{Semantic Models}

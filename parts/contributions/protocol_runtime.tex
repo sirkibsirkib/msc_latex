@@ -77,45 +77,97 @@ It is very easy to see the correspondence between a generated Java protocol and 
 	
 \end{enumerate}
 
-\section{Design Goals Defined}
-\label{sec:design_goals}
-%The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. Below, the design goals of the Rust code generator are enumerated a list of \textit{deviations} from the standard set by the Java version. Each goal is given a name such that it can be referred to in Sections~\ref{sec:reo_to_rust}~to~\ref{sec:design_goals_evaluated} to follow.
-%
-%
-%\begin{enumerate}
-%	\item[$G_1$] Prohibit aliasing where it would result in behavior disallowed by Reo's value-passing semantics.
-%	\item[$G_2$] Relax the requirement of port-data to be heap-allocated.
-%	\item[$G_3$] Minimize the number of times values with large on-stack representations must be moved.
-%	\item[$G_4$] Minimize the overhead experienced as a result of protocol components repeatedly evaluating arbitrarily expensive guards.
-%	\item[$G_5$] Enforce that ports be acted upon by two components: one acting as producer, and the other acting as consumer.
-%	\item[$G_6$] Protect the end user from being able to run protocols with uninitialized or fused ports.
-%	\item[$G_7$] Facilitate termination detection as defined by all \textit{non-protocol} components exiting.
-%\end{enumerate}
-%
-%
-%\section{Goals}
+\section{Requirements}
+The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. In this section, we lay out the requirements for Reo-rs. These requirements serve a dual purpose; firstly, it serves to structure the argumentation in sections to follow, primarily linking design choices together by providing over-arching motivations. Secondly, it provides a lens through which to view the work to follow, particularly for helping future readers to identify differences in their requirements such that different decisions can be made.
 
-The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. In this section, we lay out the requirements for Reo-rs.
-
-\subsection{Functional Requirements}
-First and foremost, we define the requirements on \textit{what} Reo-rs must do. These are the most significant requirements concentrating on functionality that empowers the end user, and safety that protects them.
+\subsection{Requirements Defined}
+First, we enumerate and name the most vital \textbf{functional requirements} for the Reo-rs library. These requirements determine \textit{what} functionality must be available to the end user of protocols and ports, and which safety properties must be preserved.
 
 \begin{enumerate}
-	\item[$\boldsymbol{F_{value}}$] TODO.
-	\item[$\boldsymbol{F_{build}}$] TODO.
+	\item[$\boldsymbol{R^F_{correct}}$] Preserve Reo's value passing semantics. No user interaction should contradict these semantics. This precludes data races as a result of \textit{mutably aliasing} resources which the user considers to be independent values.
+	
+	\item[$\boldsymbol{R^F_{init}}$] Prevent the protocol from being initialized in an inconsistent state. Prevent port objects from being unitialized, unsafely accessed in parallel, or incorrectly connected to the protocol.
+	
+	\item[$\boldsymbol{R^F_{ffi}}$] Facilitate a foreign function interface with other systems languages C and C++. Ports and protocol objects should be accessible from those languages as well as Rust, such that they can be constructed, used and destroyed.
 \end{enumerate}
 
-features, safety
-%\subsubsection{Features}
-%\subsubsection{Safety}
-\subsection{Non-Functional Requirements}
-performance, maintainability
-\section{Runtime Properties}
+Next, we enumerate the requirements which are \textit{qualitative}. By their nature, they cannot be met absolutely. Rather, they serve to guide the design of the implementation to prioritize the design decisions they affect. For those associated with run time, Chapter~\ref{sec:benchmarking} will assess the extent to which these goals are met.
+
+\begin{enumerate}
+	\item[$\boldsymbol{R^N_{data}}$] Allow the transmission of large data types without requiring the user to move the from the stack to the heap. Minimize the number of times data must be \textit{moved} in memory such that data transmission remains performant for types with large representations.	
+	
+	\item[$\boldsymbol{R^N_{fast}}$] Minimize the overhead of \textit{control
+	operations} for the protocol object to route payloads and perform bookkeeping. In particular, minimize the cost of \textit{evaluating} the rules before one is selected for firing.
+	
+	
+	\item[$\boldsymbol{R^N_{end}}$] Facilitate the protocol object being destroyed and its resources freed. Minimize the hassle of detecting when a system has terminated.
+\end{enumerate}
+
+\subsection{Requirements Evaluated}
+\hl{TODO}
+
+\section{Protocol Runtime}
 \subsection{User-Facing}
-\subsubsection{Protocol Construction}
-\subsubsection{Port Construction}
-\subsubsection{Destruction and Termination}
+\subsubsection{Construction and Destruction}
+\hl{reo-rs is designed to work with or without reo. both are provided the same surface: reo-rs provides a means of instantiating a runnable protocol object from its imperative form description.  EG of building one manually. Some error examples. Example using Reors}
+
+\hl{claim system. port objects are opaque, offering only put or get with variants. the linking is taken out of your hands.	ports can go out of scope and be re-claimed. can pass the handle around for claiming ports later. protocol gets cleaned up whene everything goes out of scope}
+
+\hl{talk about FFI}
+
+\subsubsection{Port Operations}
+\hl{putter and getters are distinct. they have variants of put and get operations. they block until they succeed. ASYNCHRONOUS means they cannot be synchronous. refer to governor chapter}
+
 \subsection{Internal}
+\hl{here we discuss how the protocol object is internally represented at a more granular level, and how it is able to coordinate the events according to its}
+
 \subsubsection{Protocol Object Architecture}
-\subsubsection{Rule Firing}
+\hl{here we give an illustration of how a protocol object is laid out. fundamentally, the protocol has a structure that corresponds to the imperative form. no symbolic names are found, instead indexes only. 
+
+1. read-only section: rules, name mappings, port info
+2. explicit CR: mem ref counts, ready and mem sets. allocator, unclaimed set
+3. implicit CR: space vector. each associated with a location. each given what they need. putter-space with rendezvous OR messagebox
+
+}
+
+
+\subsubsection{Coordinator and Interpreter}
+\hl{
+there is no protocol thread. instead, there is a coordinator ROLE, and putters and getters adopt the role every time they perform actions that may further the state of the protocol.
+
+The coordinator traverses rules, \textit{interpreting} them. instructions are protected by ready sets, and mem flags. when these are in place, INSTRUCTIONS are performed in sequence. if one triggers rollback, the actions are undone in reverse order and the rule is skipped.
+
+when all instructions are ready successfully, the rule COMMITS. this unsets readiness flags and updates state flags to indicate that memory cells are in a state of flux, and that ports are no longer waiting. it then sends out MESSAGES and returns. later, ports become ready again, and the memory cells have been reset. observe that imperative form manipulates memory cells. this is done by the coordinator during instructions. BUT the memory cannot be cleaned up can only happen later. this is explained in the section to follow.
+}
+
+\subsubsection{Data Exchange}
+\hl{
+we illustrate from the point of view of a simple rule: a single data movement with 5 getters. later, we will explain how modifications of this setup affect the outcome.
+
+putters and getters arrive, starting the PUT and GET operation. putters have a pointer to their datum, ready for it to be consumed. at this stage, the putter clearly has unique access to it. it uses an atomic operation to SWAP the pointer to its datum and sets itself as ready. this event represents te putter relinquishing access to the datum: it is given into the protocol now. getters have a pointer to their uninitialized datum to be initialized and returned. at this point in the process, the datum to be transmitted still belongs to 
+
+first, they mark themselves as ready. they yield their threads to coordinate! then they wait for a message to arrive at their messagebox, potentially blocking.
+
+when their message arrives, getters spring into action. They have been notified of a rule firing in which they are involved. getters receive (as their message) the identity of their putter. they look up this putter;s space and converge at its rendezvous. using the RENDESVOUS structure and procedure, each races to acquire a copy of the datum. using atomic operations to switch coounters and flags, eventually the dust settles. one has MOVED and N-1 have cloned. the mover knows they are last, and they send the message to the PUTTER, notifying them that the deed has been done and their datum has been consumed. all threads return and the data exchange is complete.
+
+complications:
+1. no getters
+2. memcell putter
+3. memcell getters
+4. getting from aliased data
+}
+
+\subsubsection{Type Reflection}
+\hl{a key observation for reo coordinators, is that they actually perform very few operations on the data that are particular to the type. for the most part, it doesnt matter what type the data is. for the purpose of instructions, it needs to only sometimes REPLCATE, create new ALLOCATIONS, DESTROY and check for EQUALITY. for this reason, it makes sense to treat all data the same, and instead REFLECT on its concrete type at runtime when necessary. this is achieved using DYNAMIC DISPATCH
+
+Rust has two main mechanisms for polymorphism: static and dynamic.
+blah blah.
+dynamic dispatch is close to what we need, but comes with two major downsides: you cannot DOWNCAST (make concrete) and they are represented with FAT POINTERS. Instead we have a custom approach which decouples the behavior pointer and the data pointer. this is useful for re-using allocations, using the behavior pointer as a KEY, clustering slots by type. the type pointer is not needed, as Reo knows the type of data movements based on context: movements to getters are always of the same type as the putter.
+}
+
+\subsubsection{Memory Cells}
+\hl{
+memory cells clearly outlive the stacks of any putters. therefore, the protocol has its own independent persistent memory on the heap. However, it does not use the system allocator directly; data moves through ports very quickly and the overhead of allocating new objects is exceptionally wasteful. instead, we leverage the information made available by the reo specification: we know ahead of time which memory allocations we will need, and we know precisely in which sizes and alignments they will be. we can allocate a fixed number of STORAGE SLOTS and then re=use them. A sensible implementation would simply assign such a slot to each MEMORY CELL SPACE and swap values in and out, initializing and uninitializing the same memory region repeatedly. Clearly, as these memory variables are of irregular sizes, this necessitates a level of indirection: spaces have POINTERS to an allocated heap space. while we are at it, a minor change provides a powerful optimization: we decouple storage slots and memory cells entirely with the addition of a custom ALLOCATOR with REFERENCE COUNTING. when a memory cell moves data to others, only the POINTER moves to its storage slot, and the refcount is updated accordingly. this makes movement and replication within the protocol trivially cheap. it also means that the cost of dropping values is postponed until the last possible moment: the `original' is destroyed only when the LAST memory cell removes its reference.
+}
+
 \subsubsection{Design Choices and Optimizations}

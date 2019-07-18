@@ -6,4 +6,12 @@
 \subsection{Imperative Branching}
 \hl{as propositional formulas can be converted to DNF (with disjunctions on the outermost layer), so too can imperative form rules be split over OR branches into new rules (EXAMPLE). This idea can be taken to the extreme: splitting over the elements of the data domain and once again enumerating the transition space, resulting in something with the most degenerate RBAs possible with an explosion in rules. In some cases, moving in this direction is desirable, as it has the effect of making the rule GUARDS do all of the checking; as seen earlier, boolean guarded variables can be efficiently checked in bulk. THe extreme of the spectrum is unlikely to be more efficient: the same transform values will be computed and discarded repeatedly, and as the number of boolean variables increases, at some point even batch-computing them falls behind. Future work could investigate this balance between a small number of rules, and determinisms in rules.}
 \subsection{Runtime Governors}
+\subsection{Further Runtime Optimization}
+\hl{Didn't implement everything for variious reasosn but lots is possible}
+\begin{enumerate}
+	\item simplify or remove predicates based on implicit information if rules have a KNOWN ordering. EG:: before [if P, if not P]. after [if P, true]
+	\item stuffed pointers for data types with representations no larger than ptr size. no need for allocator. complicates the refcounter mechanism
+	\item imperative form preprocessing. some redundancy exists in how you can represent things. eg: MemSwap sometimes can be achieed just by reorganizing your movements. more examples: pruning check subtries of tautologies and contradictions.
+\end{enumerate}
+
 \section{Conclusion}
