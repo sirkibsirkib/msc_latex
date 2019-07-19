@@ -107,8 +107,12 @@ Next, we enumerate the requirements which are \textit{qualitative}. By their nat
 \hl{TODO}
 
 \section{Protocol Runtime}
+\label{sec:protocol_runtime}
+
 \subsection{User-Facing}
+\label{sec:user_facing}
 \subsubsection{Construction and Destruction}
+\label{sec:construction_and_destruction}
 \hl{reo-rs is designed to work with or without reo. both are provided the same surface: reo-rs provides a means of instantiating a runnable protocol object from its imperative form description.  EG of building one manually. Some error examples. Example using Reors}
 
 \hl{claim system. port objects are opaque, offering only put or get with variants. the linking is taken out of your hands.	ports can go out of scope and be re-claimed. can pass the handle around for claiming ports later. protocol gets cleaned up whene everything goes out of scope}
@@ -116,12 +120,15 @@ Next, we enumerate the requirements which are \textit{qualitative}. By their nat
 \hl{talk about FFI}
 
 \subsubsection{Port Operations}
+\label{sec:port_operations}
 \hl{putter and getters are distinct. they have variants of put and get operations. they block until they succeed. ASYNCHRONOUS means they cannot be synchronous. refer to governor chapter}
 
 \subsection{Internal}
+\label{sec:internal}
 \hl{here we discuss how the protocol object is internally represented at a more granular level, and how it is able to coordinate the events according to its}
 
 \subsubsection{Protocol Object Architecture}
+\label{sec:protocol_object_architecture}
 \hl{here we give an illustration of how a protocol object is laid out. fundamentally, the protocol has a structure that corresponds to the imperative form. no symbolic names are found, instead indexes only. 
 1. read-only section: rules, name mappings, port info
 2. explicit CR: mem ref counts, ready and mem sets. allocator, unclaimed set
@@ -130,6 +137,7 @@ Next, we enumerate the requirements which are \textit{qualitative}. By their nat
 
 
 \subsubsection{Coordinator and Interpreter}
+\label{sec:coordinator_and_interpreter}
 \hl{
 there is no protocol thread. instead, there is a coordinator ROLE, and putters and getters adopt the role every time they perform actions that may further the state of the protocol.
 The coordinator traverses rules, \textit{interpreting} them. instructions are protected by ready sets, and mem flags. when these are in place, INSTRUCTIONS are performed in sequence. if one triggers rollback, the actions are undone in reverse order and the rule is skipped.
@@ -137,6 +145,7 @@ when all instructions are ready successfully, the rule COMMITS. this unsets read
 }
 
 \subsubsection{Data Exchange}
+\label{sec:data_exchange}
 \hl{
 we illustrate from the point of view of a simple rule: a single data movement with 5 getters. later, we will explain how modifications of this setup affect the outcome.
 putters and getters arrive, starting the PUT and GET operation. putters have a pointer to their datum, ready for it to be consumed. at this stage, the putter clearly has unique access to it. it uses an atomic operation to SWAP the pointer to its datum and sets itself as ready. this event represents te putter relinquishing access to the datum: it is given into the protocol now. getters have a pointer to their uninitialized datum to be initialized and returned. at this point in the process, the datum to be transmitted still belongs to 
@@ -156,6 +165,24 @@ Rust has two main mechanisms for polymorphism: static and dynamic.
 blah blah.
 dynamic dispatch is close to what we need, but comes with two major downsides: you cannot DOWNCAST (make concrete) and they are represented with FAT POINTERS. Instead we have a custom approach which decouples the behavior pointer and the data pointer. this is useful for re-using allocations, using the behavior pointer as a KEY, clustering slots by type. the type pointer is not needed, as Reo knows the type of data movements based on context: movements to getters are always of the same type as the putter.
 }
+
+
+\begin{listing}[ht]
+	\centering
+	\inputminted{rust}{reflection.rs}
+	\caption[Tricking Rust into exposing a vtable.]{`Tricking' the Rust compiler into retrieving the vtable of a given type \code{T} for dynamic dispatch to virtual functions of trait \code{PortDatum}. The safe cast on line~7 inserts a pointer to a vtable which the compiler will ensure is present in the program text. \code{TypeInfo} structures can later be used for type reflection, by manually appending this pointer to reconstruct the \textit{fat pointers} that Rust natively uses for dynamic dispatch.}
+	\label{listing:reflection}
+\end{listing}
+
+To illustrate how our dynamic dispatch system works, we see how the user is able to safely extract an object's vtable themselves. As an example, we see which assembly is generated for the \code{TypeInfo::of} function when the trait \code{PortDatum} consists of only one function, such that \code{u32} can implement the trait by specifyding only \code{fn something(\&self) -> usize { 45 }}. Listing~\ref{listing:reflection2} shows the result of compilation when exposing a simple public function which constructs and results the \code{TypeInfo} for~\code{u32} using the function from Listing~\ref{listing:reflection}. Here, \code{.L\_\_unnamed\_1} shows the text region of the compiled binary containing a 24-byte-long vtable for \code{u32} when dynamically dispatched as implementors of trait \code{PortDatum}. In Rust, all vtables carry information about the type's \textit{layout} (\code{u32} occupies 4 bytes, and must be 4-byte aligned in memory), as well as a pointer to its \code{drop} function for deallocation (which for \code{u32} is trivial, simply returning). The remaining field points to the single function pointer associated with the trait, returning 45 as expected.  
+
+\begin{listing}[ht]
+	\centering
+	\inputminted{text}{reflection2.rs}
+	\caption[Example of assembly generated for extracting a vtable.]{The resulting assembly showing the vtable of type~\code{u32} for dynamic dispatch of trait \code{PortDatum} (here simplified to only having a single function `\code{something}', returning an integer). Here, a function \code{foo} is exposed which creates and returns the \code{TypeInfo} of type~\code{u32} using the function shown in Listing~\ref{listing:reflection}. Observe how this function simply returns \code{.L\_\_unnamed\_1}, the vtable of \code{u32}.}
+	\label{listing:reflection2}
+\end{listing}
+
 
 \subsubsection{Memory Cells}
 \hl{
