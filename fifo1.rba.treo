@@ -1,0 +1,5 @@
+fifo1(a?, b!) {
+	#RBA
+	{a, ~b} $m = null, $m' = a
+	{~a, b} $m != null, b = $m, $m' = null
+}

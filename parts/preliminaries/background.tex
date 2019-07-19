@@ -184,6 +184,13 @@ The compiler aims to take the low-level implementation of a protocol out of the 
 
 TODO focus on RBA
 
+\begin{listing}[ht]
+	\inputminted[]{text}{fifo1.rba.treo}
+	\caption[Fifo1 connector specfication in textual Reo language.]{TODO.}
+	\label{listing:fifo1_treo}
+\end{listing}
+
+
 The steps from Reo specification to the generated glue code can be better understood when broken down into stages:
 
 \begin{enumerate}
@@ -199,66 +206,70 @@ The steps from Reo specification to the generated glue code can be better unders
 	The finished source code is generated from the resulting internal-representation. Those associated with functions in the target language are linked accordingly, and the rest are parsed and translated from the operational semantics of Reo to suitable target-language operations (such as data movement and duplication). The rules of the internal state are translated to the runtime definition of a protocol component object. An entrypoint to instantiating this protocol object is generated with the appropriate interface. The specifics of this step vary per target language.
 \end{enumerate}
 
-\section{Affine Types}
+\section{Imperative Languages}
+In this section we briefly introduce the properties relevant for discussion associated with imperative programming languages. In our case, these languages are the targets for the Reo compiler. 
 
-\cite{walker2005substructural}.
-look for linear logic. proof theory. look into Rust's motivations. We can't pull things out of the blue. 
-
-talk about TYPE-STATE pattern (aka state machine pattern)
-https://hoverbear.org/2016/10/12/rust-state-machine-pattern/
-http://cliffle.com/blog/rust-typestate/
-
-\begin{verbatim}
-pub struct X([u32;10]);
-pub struct Y([u32;10]);
+\subsection{Affine Type System}
+Classical or intuitionistic logic systems have structural rules for transforming judgements or sequents. These transformations are performed at the `meta' level, re-formulating the formula, and are thus only applicable in situations which do not add meaning to the formula (otherwise, the transformation would not be correct). One such structural rule is \textit{contraction}, in which two equal or unifiable members on the same side of a sequent are replaced by the instance they have in common. As a rule:
+\[\frac{\Gamma\vdash{}A,A,\Sigma}{\Gamma\vdash{}A,\Sigma}\]
+\hl{ask hans for a nice intro here and citation}
+Affine logic is a structural logic in which contraction is absent. In this setting, one cannot apply \textit{idempotency of entailment}. Affine type systems correspond to this domain of logic~\cite{walker2005substructural}. The logical inability to contract terms manifests as the inability to arbitrarily duplicate values. It is fruitful to think of values here as finite resources which are \textit{consumed} when involved in operations. Affine logic offers a way to model the limitations inherent to resource access such that they can be formally specified and reliably enforced. As type systems do in general, they introduce limitations on the programmer. Of course, the hardware has no problem replicating the bytes representing some integer. Why then do we limit ourselves? This argument can be made for type systems in general; the machine likewise has no problem re-interpreting the bytes storing a string as an integer. The benefits of adding these artificial constraints are to reduce the possibility space of programs such that the majority of those \textit{prohibited} by the type system are `bad'. It is common paradigm to dedicate a memory region to one kind of object for the duration of the program, making it easier to understand the program flow for programmers. Furthermore, the addition of explicit types communicates \textit{intent} to the compiler which can be readily exploited; it is common practice for compilers to perform extensive transformation on the resulting binary which preserve only the programmer's intent. 
 
 
-pub fn convert(x: X) -> Y {
-Y(x.0)
-}
-
-pub fn do_thing_1(x: X) -> u32 {
-x.0[0]
-}
-pub fn do_thing_2(x: X) -> u32 {
-let y = convert(x);
-y.0[0]
-}
--------------------
-example::convert:
-mov     rax, rdi
-mov     rcx, qword ptr [rsi + 32]
-mov     qword ptr [rdi + 32], rcx
-movups  xmm0, xmmword ptr [rsi]
-movups  xmm1, xmmword ptr [rsi + 16]
-movups  xmmword ptr [rdi + 16], xmm1
-movups  xmmword ptr [rdi], xmm0
-ret
-
-example::do_thing_1:
-mov     eax, dword ptr [rdi]
-ret
-
-example::do_thing_2:
-mov     eax, dword ptr [rdi]
-ret
-\end{verbatim}
-
-Type systems exist for the sole purpose of constraining which programs can be built, and do not add any expressiveness in terms of what can be computed. However, we know that adding (sensible) restrictions provides us other important properties. By constraining ourselves in some part, we drastically increase the number of properties that other parts are safe to assume. Affine types are a type system that applies this reasoning to explicitly managing access to variables, thus, allowing us to statically reason about resource management in a more fine-grained way. 
 
 \subsection{The Rust Programming Language}
 \label{sec:rust_language}
-introduce Drop, Move, Clone, Copy
+The Rust programming language is most similar to C++, being a general-purpose, imperative systems-level programming language with C-like syntax. What sets Rust apart is its memory model. Rust is not a memory-managed language, and has no runtime whatsoever. Instead, the language relies on its \textit{ownership system} to predictably insert allocations and deallocations at the right moment such that it \textit{runs} much as C++ would without exposing these details to the programmer. To make this possible, the Rust compiler keeps track of the variable binding which \textit{owns} a value at all times. Owned values are affine, and associating them with new variable bindings invalidates their previous binding. In Rust, this is called \textit{moving}, and doubles (at least conceptually) with the re-location of a value in memory. Listing~\ref{listing:move} illustrates how this appears to a programmer; In \code{main}, the variable \code{x} is moved into the scope of \code{func}. The subsequent access of \code{x} on line 8 is invalid, preventing this program from compiling. Once an owned value goes out of scope, it is no longer accessible, and Rust performs any destruction associated with that type. Along with the RAII (`resource acquisition is initialization') pattern popularized by C++, programmers can rest assured that their resources are created and destroyed on demand, without the need for any bookkeeping at runtime.
 
-Aside from some unusual exceptions\footnote{TODO pinned objects}, all values in rust can be \textit{moved}, which describes a \textit{value} being transferred between variable bindings, or into functions as arguments, as demonstrated in Listing~\ref{listing:move}. Clearly, the Rust compiler tracks which values have been moved. Aside from preserving affine properties, this is necessary for determining when a value should be \textit{dropped}. \code{drop} is the \textit{destructor} function invoked by the compiler on a type when its binding goes out of scope and it has not been moved. 
+\subsubsection{Borrowing}
 
-TODO we use snippets from rust, but omit clutter such as visibility qualifiers, imports and sometimes variable names
-TODo enum vs struct.
+On their own, movement is incredibly restrictive; there is no apparent way to use any resource without destroying it. To reclaim some vital functionality, Rust has the \textit{borrow system} to facilitate the creation and management of types whose ownership is \textit{dependent} on others. Similar to those in C++, programmers are able to create \textit{references} to values (also called `borrows' in Rust terms). These references are new types, and thus do not represent a transference of ownership to a new binding. Listing~\ref{listing:move2} demonstrates the example from before, but now passing the $x$ by reference into \code{func} such that \code{x} is not invalidated. The Rust compiler's \textit{borrow checker} relies on variable scoping to keep track of these borrows to ensure they do not out-live their referent, as these would manifest at runtime as \textit{dangling pointers}. This relationship between value and reference is referred to in Rust as the reference's \textit{lifetime}. Rust performs this static analysis at a per-function basis. As such, it is necessary for programmers to fully annotate the input and output types of functions, but they can usually be \textit{elided} within function bodies. This has an important consequence; the compiler does cross the boundaries between functions to interpret their relationship. 
+
+For some types there is no practical reason to enforce affinity. This is usually the case for primitives such as integers. For these cases, the language uses the \code{Copy} trait to opt-out of Rust's affine management of these resources. Copy-types behave in ways familiar to C and C++ programmers. Listing~\ref{listing:move} from before would compile just fine if Rust's 4-byte unsigned integer type~\code{u32} was used in place of~\code{Foo}.
+
+C and C++ have no inherent support for preventing data races. The programmer is in full control of their resources. It is all too easy to create data races to C by unintentionally accessing the same resource in parallel precautions. One of the tenets of Rust's design is to use its ownership system to prohibit these data races at compile-time. For this reason, Rust has an orthogonal system for \textit{mutability}. References come in two kinds: mutable and immutable. The distinction is made explicit in syntax with the \code{mut} keyword. Rust relies on a simple observation of the common ingredient for all data races: mutable aliasing; only \textit{changes} to the aliased (one resource accessible by multiple bindings) resource manifest as data races. Rust's approach is thus simply to prohibit mutable aliasing by preventing these conditions from co-existing. Mutable references must be \textit{unique} (prohibiting aliasing) and immutable references do not allow for any operations that would mutate their referent (prohibiting mutability). This is the same thinking behind the \textit{readers-writer} pattern for the eponymous lock: there is no race condition if readers coexist, but if one writer exists, it must have exclusive access. 
+
+
+
+
 \begin{listing}[ht]
 	\centering
 	\inputminted[]{rust}{move.rs}
-	\caption[Affine types in the Rust language.]{Type \code{Foo} is affine. On line 7, $x$ is moved into function \code{func}, consuming it. Accessing $x$ is invalid, and so line 8 raises an error.}
+	\caption[Example of move semantics in Rust.]{Type \code{Foo} is affine. On line 7, $x$ is moved into function \code{func}, consuming it. Accessing $x$ is invalid, and so line 8 raises an error.}
 	\label{listing:move}
+\end{listing}
+
+\begin{listing}[ht]
+	\centering
+	\inputminted[]{rust}{move2.rs}
+	\caption[Example of borrowing in Rust.]{\code{Foo} is an affine resource. New references to \code{x} are created and sent into code{func} without changing the ownership of \code{x}. Rust's \textbf{borrow checker} ensures that these borrows do not outlive \code{x}.}
+	\label{listing:move2}
+\end{listing}
+
+\subsubsection{Traits and Polymorphism}
+The primary means of polymorphism in Rust is through generic types with \textit{trait bounds}. Traits are most similar to interfaces in Java, categorizing a group of instantiable types by defining abstract functions for which implementors provide definitions. Unlike Java, Rust traits say nothing about fields and data, thus describing only their behavior. In this manner, Rust traits are somewhat like C's header files, but rather to be defined per implementor type. Elsewhere in the program, functions and structures can make use of \textit{generic} types. These types are arbitrary and thus opaque to any behavior save for those common to all Rust types; for example, any type at all can be \textit{moved} or can be \textit{borrowed} in Rust. To perform more specialized operations on these generic types, they can be \textit{bounded} with traits. This acts as a contract between the generic context and its concrete call-site; the caller promises that the generic type is reified only with a type which implements the specified traits, and thus the generic can be used in accordance with the behavior these traits provide. This is demonstrated in Listing~\ref{listing:traits}. Here, \code{something} is a function which can be invoked with \code{T} chosen to be any type implementing trait \code{T}, such as \code{String}. 
+
+Above, we see how a function can be defined such that it operates on a generic type. However, the function cannot be used until the type is chosen concretely for a particular instance. This choice is called \textit{dispatch}, and Rust offers two options: static and dynamic. \textit{Static dispatch} (also called `early binding') is used when the called function can be informed which concrete type has been chosen statically, as the caller knows it at the call-site. During compilation, the generic function is \textit{monomorphized} for the type chosen in this manner on a case-by-case basis, generating binary specialized for that type as if there were no generic at all. Static dispatch is used in C++ templates, and opted-out with the keyword \code{virtual}. This is Rust's second option: \textit{dynamic dispatch} (also called virtual functions or late binding) where the generic function exists as only one instance, and all of the specialized operations on the generic type are resolved to concrete functions at runtime by traversing a layer of indirection: functions are \textit{looked up} in a virtual function table (vtable). Java uses such virtualization extensively, which allows a lot of flexibility such as allowing functions to be \textit{overridden} by downstream inheritants. Precisely how a language represents virtual functions and lays out the data in memory varies from language to language. Rust uses the \textit{fat pointer} representation in its \textit{trait objects}. Concretely, some generic object which is known only to implement trait~\code{Trait} is represented as a pair of pointers; the first pointing to the actual object' data, and the second pointing to a dense structure of meta-data and function pointers for the methods of~\code{Trait}, usually embedded into the text section of the binary by the Rust compiler itself.
+
+Rust uses traits for just about everything. Some traits are defined in the standard library, and have a degree of `first class' status by having special meaning when used in combination with the language's syntax. For example,~\code{Not} is a trait that defines a single function,~\code{not}, which is invoked when the type is negated using the usual exclamation syntax, ie.\ \code{!true}. Some traits have no associated functions, instead exist for the purpose of communicating information to the compiler. Seen before,~\code{Copy} is a trait which disables the Rust compiler's checks of a value's affinity. \code{Copy}-types may be passed by value. On the other hand, \code{Drop} associates the \code{drop} function with a type, which the compiler will invoke when it goes out of scope; this is the parallel to the definition of destructors in C++. It is common practice in Rust to rely upon common traits such as these for frequently-occurring cases. For example, it is considered good practice to implement \code{Debug} on your custom traits such that they can be printed using \textit{debug print} syntax (eg.\ \code{print!("{:?}", foo)}) for programmers depending on your work.
+
+\begin{listing}[ht]
+	\centering
+	\inputminted[]{rust}{traits.rs}
+	\caption[TODO.]{TODO.}
+	\label{listing:traits}
+\end{listing}
+
+\subsubsection{Enums and Error Handling}
+As in C, Rust usually relies on \code{struct} for defining its types. Each is defined as the list of its constituent fields. Creation of these structures necessitates building all of their constituents, and all fields exist at once. By contrast, \textit{sum types} have \textit{variants} only one of which may be present at a time. Arguably, the duck-typing of Python and flexible polymorphism of Java do the work of these sum types; a variable can be bound to \textit{anything} and then its `variant' can be reflected at runtime using some explicit operations (\code{ininstance} and \code{instanceof} respectively). C takes the approach fitting the language's philosophy; \code{union} types represent any one of its constituents but the program is at the mercy of the programmer to interact with it as the correct variant as they see fit. Rust's solution is similar to C's unions, but its focus on safety required the use of \textit{tags}. In Rust, an \code{enum} type is defined with a list of variants, only one of which may exist per intance at a time. At runtime, the variant can be descriminated by explicitly \textit{pattern-matching}, inspecting some implicit meta-data field of the enum stores to reflect which of the variants is in use. Like C's unions, each variant can be an arbitrary type (another struct for example), these variants can be of heterogeneous size, and thus are represeted by the largest of their variants \textit{plus} the space for the tag. 
+
+Unlike Java and Python, Rust has no mechanism for \textit{throwables} which override the default control flow, usually for the purposes of ergonomically handling errors. Instead, Rust represents all recoverable errors in the data domain as enums. The standard library defines \code{Option} and \code{Result} enums, which are monadic in that they \textit{wrap} the `useful' data as one of the variants, but represent the possibility for \textit{other} variants also. They differ in that \code{Option::None} carries no data, and thus \code{Option} is generic only over one type, the contents of the \code{Some} variant. \code{Result}, on the other hand, has two generic types, one for its `successful' \code{Result::Ok} variant, and one for its `unsuccessful' \code{Result::Err} variant. Listing~\ref{listing:enums} gives an example of typical error-handling in Rust; here, \code{divide\_by} relies on \code{Result} to propagate the error for the caller to handle.
+
+\begin{listing}[ht]
+	\centering
+	\inputminted[]{rust}{enums.rs}
+	\caption[TODO.]{TODO.}
+	\label{listing:enums}
 \end{listing}
 
 \subsection{The Type-State Pattern}
