@@ -187,26 +187,46 @@ Our implementation introduces a new idea in an attempt to capitalize on this obs
 \label{sec:protocol_object_architecture}
 \code{Proto} is a type corresponding closely to its imperative-form specification type, \code{ProtoDef}. While they represent the same thing, their differences in structure and contents are a result of them being used for different \textit{purposes}. Despite the increase in granularity from Reo's RBA-like form, \code{ProtoDef} still represents a \textit{specification} of the protocol; as such, it strives to minimize redundancy to simplify parsing and minimize the surface for internal inconsistency. On the other hand, \code{Proto} is structured to facilitate \textit{execution} at runtime.
 
-:
 \begin{enumerate}
 	\item \textbf{Layout optimized for speed.}\\
 	As discussed in Section~\ref{sec:imperative_to_rust}, the \code{build} method is the only user-accessible means of constructing \code{Proto} instances. The methods of this type can rely on this to assume that their contents are internally consistent, thereby avoiding the cost of performing many checks at runtime. For example, if a \textit{rule guard} includes an equality check between the values in memory cells $m_0$ and $m_1$, \code{Proto} is able to assume that these cells have the same type; it is safe to use the result of $m_0$'s definition of type-equality.
 	
+	Additionally, concise structures can be re-arranged such that their layout facilitates less computation time. A general example of this paradigm is caching. Here, a clear example is the replacement with symbolic \textit{names} for ports, functions and memory cells (represented by strings in the \code{ProtoDef} type), using \textit{integers} for keying into vectors, maps and other such structures directly.
+	
 	\item \textbf{Additional data for primitive concurrency.}\\
+	Where \code{ProtoDef} can leave information implicit, \code{Proto} must be explicit. Interface ports require some data structures for storing concurrency primitives. For example, coordinators must send \textit{control messages} to getters, as explained in Section~\ref{sec:chosen_design} above. 
 \end{enumerate}
 
+\subsubsection{Critical Region}
+Section~\ref{sec:chosen_design} explains how threads initiating actions at boundary ports of a protocol assume the role of coordinator. It is fruitful to examine the fields of \code{Proto} in accordance to which \textit{roles} access them, and how their access is safely controlled. The most coarse-grained distinction is that between fields inside and outside the protocol's lock-protected \textit{critical region}. This divide is so fundamental, that is is immediately apparent by looking at the definition of \code{Proto} itself, seen in Listing~\ref{listing:proto}. \code{ProtoCr} stores all of the fields manipulated only by the coordinator, such as the \textit{allocator}, to which the coordinator delegates the task of storing persistent values. This is explained further in Section~\ref{sec:memory_cells} to follow. Also observe the field responsible for managing which ports are \textit{claimed}. While this is not a task traditionally associated with the coordinator, it's mutually-exclusive access between threads necessitates that this structure is protected by the lock.
 
+\subsubsection{Spaces}
+Clearly, \code{ProtoCr} can contain only the data that is not contended by multiple threads. Some structure is still needed for threads to \textit{rendezvous} such that information can be exchanged and actions can be aligned in time. In the Java implementation, the class \code{Port} served two distinct purposes: (1) stored the value being exchanged by two threads, and (2) acted as the rendezvous for putter and getter. As explained in Section~\ref{sec:chosen_design} above, the former of these tasks does not involve the coordinator in Reo-rs. However, the latter is still relevant. To meet this need, \code{ProtoR} associates \textit{space} for every identifier (for ports and memory cells alike). The difference is name exists to distinguish them from ports, to which they are certainly related, but not identical. For every identifier, its \code{Space} contains precisely the data needed for it to communicate with its peers. For ports, this includes a \code{MsgBox}, which serves as a control-message channel from coordinator to compute-thread. Spaces are discussed further in Section~\ref{sec:data_exchange} to follow. 
 
-\hl{here we give an illustration of how a protocol object is laid out. fundamentally, the protocol has a structure that corresponds to the imperative form. no symbolic names are found, instead indexes only. 
-1. read-only section: rules, name mappings, port info
-2. explicit CR: mem ref counts, ready and mem sets. allocator, unclaimed set
-3. implicit CR: space vector. each associated with a location. each given what they need. putter-space with rendezvous OR messagebox
-}
+\begin{listing}[ht]
+	\centering
+	\inputminted{rust}{proto.rs}
+	\caption[Proto type with parts inside and outside the lock.]{Definitions of the most coarse-grained structures of a protocol instance. \code{Proto} is the entry-point, composed of \code{ProtoCr} in the critical section, accessed by only the coordinator, and \code{ProtoR} outside it, accessed by all.}
+	\label{listing:proto}
+\end{listing}
+
 
 \subsection{Behavior}
 \label{sec:behavior_implementation}
+This section explains how the data structures of the \code{Proto} type comes to life at runtime to emerge as coordination according to the protocol with which it was configured. 
 
-\subsubsection{Coordinator and Interpreter}
+\subsubsection{Rule Interpreter}
+Unlike the Java implementation, Reo-rs moves the specification of the protocol type very late into the pipeline from Reo to the final application. Rather than relying on Reo to generate \textit{native} application code, in this work we make more extensive use of the \textit{virtualization} pattern. At runtime, the coordinator traverses rules in data form, performing tasks as a rudimentary \textit{interpreter}. 
+
+
+\begin{listing}[ht]
+	\centering
+	\inputminted{rust}{rule.rs}
+	\caption[TODO.]{TODO.}
+	\label{listing:rule}
+\end{listing}
+
+
 \label{sec:coordinator_and_interpreter}
 \hl{
 there is no protocol thread. instead, there is a coordinator ROLE, and putters and getters adopt the role every time they perform actions that may further the state of the protocol.
@@ -229,6 +249,7 @@ complications:
 }
 
 \subsubsection{Type Reflection}
+\label{type_reflection}
 \hl{a key observation for reo coordinators, is that they actually perform very few operations on the data that are particular to the type. for the most part, it doesnt matter what type the data is. for the purpose of instructions, it needs to only sometimes REPLCATE, create new ALLOCATIONS, DESTROY and check for EQUALITY. for this reason, it makes sense to treat all data the same, and instead REFLECT on its concrete type at runtime when necessary. this is achieved using DYNAMIC DISPATCH
 
 Rust has two main mechanisms for polymorphism: static and dynamic.
@@ -255,6 +276,7 @@ To illustrate how our dynamic dispatch system works, we see how the user is able
 
 
 \subsubsection{Memory Cells}
+\label{sec:memory_cells}
 
 \hl{
 memory cells clearly outlive the stacks of any putters. therefore, the protocol has its own independent persistent memory on the heap. However, it does not use the system allocator directly; data moves through ports very quickly and the overhead of allocating new objects is exceptionally wasteful. instead, we leverage the information made available by the reo specification: we know ahead of time which memory allocations we will need, and we know precisely in which sizes and alignments they will be. we can allocate a fixed number of STORAGE SLOTS and then re=use them. A sensible implementation would simply assign such a slot to each MEMORY CELL SPACE and swap values in and out, initializing and uninitializing the same memory region repeatedly. Clearly, as these memory variables are of irregular sizes, this necessitates a level of indirection: spaces have POINTERS to an allocated heap space. while we are at it, a minor change provides a powerful optimization: we decouple storage slots and memory cells entirely with the addition of a custom ALLOCATOR with REFERENCE COUNTING. when a memory cell moves data to others, only the POINTER moves to its storage slot, and the refcount is updated accordingly. this makes movement and replication within the protocol trivially cheap. it also means that the cost of dropping values is postponed until the last possible moment: the `original' is destroyed only when the LAST memory cell removes its reference.
