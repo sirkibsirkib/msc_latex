@@ -216,23 +216,26 @@ Clearly, \code{ProtoCr} can contain only the data that is not contended by multi
 This section explains how the data structures of the \code{Proto} type comes to life at runtime to emerge as coordination according to the protocol with which it was configured. 
 
 \subsubsection{Rule Interpreter}
-Unlike the Java implementation, Reo-rs moves the specification of the protocol type very late into the pipeline from Reo to the final application. Rather than relying on Reo to generate \textit{native} application code, in this work we make more extensive use of the \textit{virtualization} pattern. At runtime, the coordinator traverses rules in data form, performing tasks as a rudimentary \textit{interpreter}. 
+Unlike the Java implementation, Reo-rs moves the specification of the protocol type very late into the pipeline from Reo to the final application. Rather than relying on Reo to generate \textit{native} application code, in this work we make more extensive use of the \textit{virtualization} pattern. At runtime, the coordinator traverses rules in data form, performing tasks as a rudimentary \textit{interpreter}. The tasks associated with such a \code{Rule} correspond closely to the conceptual interpretation of the imperative form; as such, they are treated like \textit{transactions} at runtime. 
 
 
-\begin{listing}[ht]
-	\centering
-	\inputminted{rust}{rule.rs}
-	\caption[TODO.]{TODO.}
-	\label{listing:rule}
-\end{listing}
+\subsubsection{Minimizing the Bottleneck}
+Reo-rs shares its centralized locking architecture with the Java back-end. Regardless of whether the coordinator and the thread that performs the role are decoupled, the importance of providing it mutual exclusion is clear; two coordinators in tandem would not be safe in the knowledge that the state does not change between evaluating the guards and changing the state. Methods exist for \textit{fragmenting} protocols such that the locking becomes finer grained as protocols are into sets of smaller ones. As such, the Reo compiler internally produces a \textit{protocol set} as its output, though the work on this feature is ongoing. Nevertheless, we consider this decomposition an orthogonal concern and consider it no farther. Reo-rs embraces this central lock, but takes measures to minimize the duration for which it is held. In this section we discuss these measures and how they work together to help satisfy $\boldsymbol{R^N_{fast}}$. To structure our reasoning, we identify the tasks a coordinator performs from the moment to acquires the lock (accepting its role), to the moment it releases it (relinquishing the role). 
 
-
-\label{sec:coordinator_and_interpreter}
-\hl{
-there is no protocol thread. instead, there is a coordinator ROLE, and putters and getters adopt the role every time they perform actions that may further the state of the protocol.
-The coordinator traverses rules, \textit{interpreting} them. instructions are protected by ready sets, and mem flags. when these are in place, INSTRUCTIONS are performed in sequence. if one triggers rollback, the actions are undone in reverse order and the rule is skipped.
-when all instructions are ready successfully, the rule COMMITS. this unsets readiness flags and updates state flags to indicate that memory cells are in a state of flux, and that ports are no longer waiting. it then sends out MESSAGES and returns. later, ports become ready again, and the memory cells have been reset. observe that imperative form manipulates memory cells. this is done by the coordinator during instructions. BUT the memory cannot be cleaned up can only happen later. this is explained in the section to follow.
-}
+\begin{enumerate}
+	\item \textbf{Initialization}\\
+	Section~\ref{sec:port_operations} explains how the time spent purely on \textit{overhead} is diminished by removing the event-signal interaction necessary when the coordinator is asleep, waiting for an event. Transitioning into the work of the coordinator is nothing more than the time taken to invoke the \code{coordinate} function call.
+	
+	\item \textbf{Checking Readiness and Memory State}\\
+	Imperative form shares the explicit representation of the \textit{synchronization set} with RBAs, encoding precisely which ports are involved with the firing. Clearly, a rule cannot fire until all ports involved are \textit{ready}. Per port, this is a boolean property which can be represented by a single bit flag. Owing to the simplicitly of the data it encodes, these sets can be represented in the \code{ProtoCr} as a single \textit{bit-vector}, a data structure for which set-operations are exceptionally fast. Reo-rs takes this optimization a step further by extracting another boolean property per memory cell: fullness. The idiomatic encoding for memory cells storing data of type \code{T} in Rust would be the \code{Option<T>} type, such that \code{Option::None} represents \textit{emptiness}. Instead, the flag for fullness is extracted and placed in another bit-vector. With just a handful of fast bit-wise operations, the coordinator is able to quickly detect when a rule \textit{cannot} fire, as a result of a port not being ready, or a memory cell being full when it should be empty, or empty when it should be full. In practice, the vast majority of evaluations of rule guards for which the rule cannot fire are such as a result of one of these boolean values being in the wrong state.
+	
+	\item \textbf{Instructions}\\
+	Instructions are relatively expensive compared to the other steps in a rule's interpretation. Their cost scales with their complexity, as they can be defined as arbitrarily large and deep formula terms. Even individually, the cost of each operation can be high, as they include arbitrary user-defined function invocations, arbitrary user-defined equality checks, and allocation of new types. Section~\ref{sec:memory_cells} explains how the cost of memory allocation is mitigated such that the allocation itself is amortized to constant time. For the rest of these operations, there is not much that can be done to avoid the cost; for the most part, they would be expensive even if each rule were performed by a native Rust function. Fortunately, the vast majority of rules for Reo connectors require no instructions at all. In practice, Reo connectors do not \textit{inspect} the data whose flow they coordinate. The more intrusive the protocol's routing logic becomes, the more it begins to resemble \textit{computation}, a task for which Reo should probably not be optimized. For the protocols without instructions (including \textit{fifo1}, \textit{alternator}, \textit{sequencers}, \textit{sync}, \textit{lossy sync} and more), the support for instruction parsing costs no more than the time to look up the length of the instruction field to be zero.
+	 
+	 \item \textbf{Movements}\\
+	 TODOD
+	
+\end{enumerate}
 
 \subsubsection{Data Exchange}
 \label{sec:data_exchange}
@@ -280,21 +283,4 @@ To illustrate how our dynamic dispatch system works, we see how the user is able
 
 \hl{
 memory cells clearly outlive the stacks of any putters. therefore, the protocol has its own independent persistent memory on the heap. However, it does not use the system allocator directly; data moves through ports very quickly and the overhead of allocating new objects is exceptionally wasteful. instead, we leverage the information made available by the reo specification: we know ahead of time which memory allocations we will need, and we know precisely in which sizes and alignments they will be. we can allocate a fixed number of STORAGE SLOTS and then re=use them. A sensible implementation would simply assign such a slot to each MEMORY CELL SPACE and swap values in and out, initializing and uninitializing the same memory region repeatedly. Clearly, as these memory variables are of irregular sizes, this necessitates a level of indirection: spaces have POINTERS to an allocated heap space. while we are at it, a minor change provides a powerful optimization: we decouple storage slots and memory cells entirely with the addition of a custom ALLOCATOR with REFERENCE COUNTING. when a memory cell moves data to others, only the POINTER moves to its storage slot, and the refcount is updated accordingly. this makes movement and replication within the protocol trivially cheap. it also means that the cost of dropping values is postponed until the last possible moment: the `original' is destroyed only when the LAST memory cell removes its reference.
-}
-
-\subsubsection{Minimizing the Bottleneck}
-\label{sec:minimizing_the_bottleneck}
-\hl{
-talk about the central lock. goal is to minimize the duration for which it is held. the only thing the coordinator does is traverse rules, trying to fire them. as such, we can understand how this time is minimized by decomposing the work of a single rule into its constituent steps:
-1. evaluate the readiness and memory bits. also true for batch UN-assigning
-BITVECS for BATCHING
-
-2. instructions
-assume they are rare
-
-3. movements
-the protocol object just initializes the rendesvoux and fires messages and drops the lock. the actual data-exchange happens concurrently with new rules being fired. in this way, many ports can exchange data in parallel, as their READINESS flags are protected by the CR and thus only rules for which all ports and memory cells are in stable state can be fired concurrently.
-
-\textbf{}
-
 }
