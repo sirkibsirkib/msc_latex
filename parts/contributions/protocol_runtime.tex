@@ -287,7 +287,14 @@ Another optimization exists for cases where the data type implements the \code{C
 
 \subsubsection{Memory Cells}
 \label{sec:memory_cells}
-WORDS
+
+Reo allows the expression of \textit{stateful} protocols whose rules move data into and out of memory cells inside the protocol itself. The protocol object already stores \textit{references} to data on the stacks of port-putters, but this data is \textit{transient}, where memory cells are persistent. To play the part, each protocol object contains a \code{Storage} structure, which acts as a custom \textit{memory allocator}. As the \textit{system allocator} (familiar in C through functions \code{alloc} and \code{free}) depends on a simpler layer of system calls (\code{mmap} etc.) to provide the intended functionality, so too does the \code{Storage} rely on the system allocator. This special type has much the same functionality of the system allocator, but is designed to take advantage of a non-trivial property of Reo protocols: We at most require one allocation per memory cell, and we know the required memory size and alignment ahead of time, as these cells are typed. Thus, \code{Storage} will make a constant number of system-allocations at runtime, re-using the allocated slots as data is moved in and out.
+
+As both the behavior of the coordinator and the allocator are under the control of Reo-rs, it is safe to represent values in memory cells with a layer of indirection between a \textit{memory cell} (a variable that is involved with guards and rules), and \textit{storage cell} (A chunk of memory reserved by the allocator). Regardless of the size of the data itself, `moving' it between memory cells is an instance of \textit{reference passing}.
+
+This approach can be easily extended to facilitate a powerful optimization: \textit{aliasing}. In practice, it is common for Reo to replicate data without mutating either replica. Until the replicas diverge, it is perfectly correct to \textit{alias} the original memory cell by copying its storage-cell reference. Here, the contents of a storage cell are only moved out again if the reference to it is \textit{unique}. This necessitates \textit{reference counting}.
+
+Observe that this approach allows us to \textit{delay} the cost of the \code{clone} operation, avoiding it entirely in cases where the clone is never mutated nor moved out of protocol memory before being discarded; ie. aliased references are made independent with \code{clone} \textit{lazily}. The logical extreme of this idea is to avoid unnecessary clones entirely, covering cases where a value is cloned into memory from a putter, and then discarded. (TODO) Our solution relies on the Reo compiler's minimization procedure to remove these data-movements when the value is \textit{statically} guaranteed to be discarded before use. Supporting the \code{get\_signal} operation described in Section~\ref{sec:port_features} prevents us from avoiding these clones where their values are discarded \textit{dynamically}, as the choice of whether it will be used is not decided until \textit{after} the putter has returned, invalidating the original datum.
 %\hl{
 %memory cells clearly outlive the stacks of any putters. therefore, the protocol has its own independent persistent memory on the heap. However, it does not use the system allocator directly; data moves through ports very quickly and the overhead of allocating new objects is exceptionally wasteful. instead, we leverage the information made available by the reo specification: we know ahead of time which memory allocations we will need, and we know precisely in which sizes and alignments they will be. we can allocate a fixed number of STORAGE SLOTS and then re=use them. A sensible implementation would simply assign such a slot to each MEMORY CELL SPACE and swap values in and out, initializing and uninitializing the same memory region repeatedly. Clearly, as these memory variables are of irregular sizes, this necessitates a level of indirection: spaces have POINTERS to an allocated heap space. while we are at it, a minor change provides a powerful optimization: we decouple storage slots and memory cells entirely with the addition of a custom ALLOCATOR with REFERENCE COUNTING. when a memory cell moves data to others, only the POINTER moves to its storage slot, and the refcount is updated accordingly. this makes movement and replication within the protocol trivially cheap. it also means that the cost of dropping values is postponed until the last possible moment: the `original' is destroyed only when the LAST memory cell removes its reference.
 %}
@@ -296,7 +303,48 @@ WORDS
 
 \subsubsection{Type Reflection}
 \label{type_reflection}
-WORDS
+
+As explained in Section~\ref{sec:rust_language}, Rust offers \textit{static dispatch} for monomorphizing generic code when the concrete types are known statically at the call site. This approach is not 
+
+The interpreter approach taken by Reo-rs has a consequence: \code{Proto} does not know port data types at compile time. 
+
+For most purposes, the coordinator does not need to know the types of the data being exchanged by participants. In some cases, it needs to know \textit{some things} to provide the functionality described in previous sections:
+\begin{enumerate}
+	\item Moving a value requires knowing the size of it's representation in memory.
+	\item \code{clone} is uniquely defined for every type.
+	\item \code{drop} may be uniquely defined for the type, or not at all.
+	\item Allocating a storage cell requires knowing the type's in-memory \textit{size} and \textit{alignment}.
+	\item Guard predicates may require access to a type-specific \code{partial\_eq} function to be evaluated.
+\end{enumerate}
+
+The Rust language primarily supports type polymorphism in two ways:
+\begin{enumerate}
+	\item \textbf{Static}\\
+	Functions and types can be written with behavior such that they interact with objects in terms of their trait bounds. When compiled, these generic definitions do not appear in the binary at all. Rather, instances in which the generic parameters are made \textit{concrete} are \textit{monomorphized}, generating downstream definitions as required with the generic arguments reified as concrete types as if the programmer had written them themselves. In a sense, static polymorphism in Rust is similar to \textit{macros}. This approach is similar to \textit{templates} in C++, and are also referred to as `zero-cost abstractions' owing to their disappearance at compile time.
+	
+	\item \textbf{Dynamic}\\
+	Some traits are eligible for instantiating implementors as \textit{trait objects}. This creates a new type from one pointer to their data (the original structure), and another to a \textit{virtual function table} (`vtable') which contains a list of pointers to the trait's associated functions and constants. This indirection incurs some slight overhead, but means that heterogeneous types may be treated as the same trait object. Unlike Java, Rust uses the \textit{fat pointer} approach to representing these objects, meaning that their data and vtable pointers are stored at the shallowest level. This is in contrast to \textit{thin pointers}, where the shallowest representation is to an object containing a vtable as the first field.
+	
+\end{enumerate}
+
+Static polymorphism is not a good fit for our use case, as Reo-rs is decoupled from the Reo-generated source code such that it \textit{cannot} expose the correct generic parameters, as they are not known. Dynamic polymorphism is closer, but Reo-rs still cannot know which \textit{type constraints} to enforce such that the resulting vtables have the correct fields.
+
+Instead, this work again leverages the unique properties of Reo (each port and memory cell has a fixed, known type) by creating a better-fitting custom solution. Reo-rs uses something similar to Rust's dynamic dispatch, but intentionally separates the data and vtable pointers. Additionally, our vtable-like structure has fields for precisely the information we need, and is prepared to store \textit{optional} pointers for any functions that may not apply (some type may have \code{None} for its drop-function, for example). The definition of this type is shown in Listing~\ref{listing:type_info}. This approach has the benefit of allowing Reo-rs to move thin pointers around, ignoring types until they are needed, whereby they can be found by reflecting on data in context. For example, The protocol object stores a mapping from putter to vtable on initialization. Type reflection is visible in Listing~\ref{listing:data_source} as interactions with the \code{type\_info} field of the variable \code{self}.
+
+
+\begin{listing}[ht]
+	\inputminted[]{rust}{type_info.rs}
+	\caption{The \code{TypeInfo} structure stores all the data needed for Reo-rs to perform runtime type reflection. In addition to meta-data (such as \textit{memory layout} for heap allocation), it acts as a \textit{virtual function table} for the functions that Reo-rs may need. \code{Option<fn(T)>} types have the same in-memory representation of \code{fn<T>}, but have a safer API by representing null pointers as \code{None}.}
+	\label{listing:type_info}
+\end{listing}
+
+
+\subsection{Firable Rules}
+Hopefully, the complexity of the previous sections has made clear why generating optimized Rust code for this design is too great a burden for the Reo code generator to reasonably bear. As explained in Section~\ref{sec:reo_to_rust}, this task is instead performed by Reo-rs by exposing a simpler API to the code generator.
+As a result, it is infeasible for Reo-rs to generate specialized native firing functions based in the input of the code generator, as it is essentially given in \textit{data}. Instead, Reo-rs constructs instances of the type \code{RunRule}, encoding the work to be done by populating fields of putters and getters. At run time, \code{fire} traverses these fields and performs the work as it interprets it. Building theses structure is simple enough to be feasible, and some optimizations are still practical (for example, those described in Section~\ref{sec:minimizing_bottleneck}). This data-representation has the advantage of facilitating the \textit{modification} of protocols at run-time. This has applicability in research areas of Reo such as \textit{dynamic reconfiguration}.
+
+Nevertheless, this data-representation has non-trivial implications for run-time performance\footnote{Not all of the implications are negative. This data-representation may make better use of cache locality, owing to it essentially using the \textit{virtualization} pattern.}. In future, a third avenue shows promise for the best of both worlds: \textit{procedural macros}. Rust supports several modes for macro definition, the most familiar of which is the \textit{declarative macro} which matches tokens of Rust's \textit{abstract syntax tree} (AST) and performs replacements and so on. This mode is related to string-replacement macros in C. \textit{Procedural macros} are a whole different ballgame, to the programmer seeming like arbitrary function definitions which produce an AST given an AST. These macros are executed \textit{inside the Rust compiler} to perform arbitrary transformations on a Rust program as it is being compiled. In a sense, procedural macros offer a means for a program to opt-into custom compiler extensions. With this feature, it becomes feasible for Reo-rs to expose a public macro that takes a declarative data-movement description that looks like RBA rules (for an example, see Listing~\ref{listing:alternator}), and generate a native-Rust function complete with static checking. Indeed, procedural macros offer the sort of meta programming that might be \textit{ideal} of the sorts of code-generation problems Reo presents. Currently, procedural macros are not entirely stable. They are also incredibly confusing to write, and thus were not considered a priority for this work.
+
 %\hl{a key observation for reo coordinators, is that they actually perform very few operations on the data that are particular to the type. for the most part, it doesnt matter what type the data is. for the purpose of instructions, it needs to only sometimes REPLCATE, create new ALLOCATIONS, DESTROY and check for EQUALITY. for this reason, it makes sense to treat all data the same, and instead REFLECT on its concrete type at runtime when necessary. this is achieved using DYNAMIC DISPATCH
 %Rust has two main mechanisms for polymorphism: static and dynamic.
 %blah blah.
