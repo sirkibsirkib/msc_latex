@@ -234,34 +234,64 @@ Reo-rs shares its centralized locking architecture with the Java back-end. Regar
 	Instructions are relatively expensive compared to the other steps in a rule's interpretation. Their cost scales with their complexity, as they can be defined as arbitrarily large and deep formula terms. Even individually, the cost of each operation can be high, as they include arbitrary user-defined function invocations, arbitrary user-defined equality checks, and allocation space for newly-created data objects. Section~\ref{sec:memory_cells} explains how the cost of memory allocation is mitigated such that the allocation itself is amortized to constant time. For the rest of these operations, there is not much that can be done to avoid the cost; for the most part, they would be expensive even if each rule were performed by a native Rust function. Fortunately, the vast majority of rules for Reo connectors require no instructions at all. In practice, Reo connectors tend not to \textit{inspect} the data whose flow they coordinate. The more intrusive the protocol's routing logic becomes, the more it begins to resemble \textit{computation}, a task for which Reo should probably not be optimized. For the protocols without instructions (including \textit{fifo1}, \textit{alternator}, \textit{sequencers}, \textit{sync}, \textit{lossy sync} and more), the support for instruction parsing costs no more than the time to determine that there are zero instructions to execute.
 	 
 	 \item \textbf{Movements}\\
-	 As touched upon in Section~\ref{sec:port_operations}, the coordinator's role in data movements is not to shift values in memory from one place to the other. Instead, each rule encodes (as data) a list of \textit{movements}, each with one \textit{resource} (a \code{Putter} or memory cell) and a number of getters. For each movement, the coordinator \textit{resets} the \code{Rendezvous} structure in the associated putter's \code{Space} (such that it knows how many getters to expect). For each getter, the coordinator finds their space and sends them a \textit{control message} (an integer), telling the identity of their putter. No other action is necessary; getters will take care of finding their value, acquiring it and cleaning up all on their own in parallel. The exception to this rule is the case of a putter with zero getters; clearly no getters exist to take the responsibility of cleaning up. In these cases the coordinator takes it upon themselves to clean up immediately. 
+	 Once a rule is committed, the role of the coordinator is to kick any getters into action, delegating the data exchange to them. Each \textit{movement} encodes one \textit{resource} (\code{Putter} or memory cell) being distributed amongst a set of \textit{recipients} (each a \code{Getter} or memory cell). This meta-interaction is not synchronous; getters may take arbitrary time before waking up and actually participating in the data exchange. This is not the case for memory cells; as part of the \textit{state} of the protocol, this is manipulated by the coordinator only. As such, operations which move values \textit{into} memory (where memory cells act as getters) are performed first. Section~\ref{sec:memory_cells} explains this procedure in more detail. Here, it suffices to say that the movement of memory between memory cells is fast.
 	 
-	 \hl{TODO MEMCELLS AND PORT PUTTER CLEANUP REFER TO other SECTIONS TO FOLLOWs}
-	
+	 For port-getters, the coordinator does not move the value itself. Rather, the work is delegated to the compute-thread by sending a \textit{control message} to the getter's \code{MsgBox}. 
+	 
+	 Usually, the coordinator does not have to interact with the resource (acting as putter) at all. It can rely on getters to `clean up'. The coordinator returns, releasing the protocol lock. The only exception is for movements with \textit{zero getters}. Such cases can represent a resource being destroyed. In these cases, there is no getter to perform the cleanup, and so, the coordinator does it itself. For a \code{Putter}, this is no more than sending a control message, releasing it. For memory cells, this may require running the \textit{destruction} function associated with the memory cell's data type.  Section~\ref{sec:memory_cells} provides more detail on how these are managed.
+	 	
 \end{enumerate}
 
 \subsubsection{Data Exchange}
 \label{sec:data_exchange}
-\hl{
-we illustrate from the point of view of a simple rule: a single data movement with 5 getters. later, we will explain how modifications of this setup affect the outcome.
-putters and getters arrive, starting the PUT and GET operation. putters have a pointer to their datum, ready for it to be consumed. at this stage, the putter clearly has unique access to it. it uses an atomic operation to SWAP the pointer to its datum and sets itself as ready. this event represents te putter relinquishing access to the datum: it is given into the protocol now. getters have a pointer to their uninitialized datum to be initialized and returned. at this point in the process, the datum to be transmitted still belongs to 
-first, they mark themselves as ready. they yield their threads to coordinate! then they wait for a message to arrive at their messagebox, potentially blocking.
-when their message arrives, getters spring into action. They have been notified of a rule firing in which they are involved. getters receive (as their message) the identity of their putter. they look up this putter;s space and converge at its rendezvous. using the RENDESVOUS structure and procedure, each races to acquire a copy of the datum. using atomic operations to switch coounters and flags, eventually the dust settles. one has MOVED and N-1 have cloned. the mover knows they are last, and they send the message to the PUTTER, notifying them that the deed has been done and their datum has been consumed. all threads return and the data exchange is complete.
-complications:
-1. no getters
-2. memcell putter
-3. memcell getters
-4. getting from aliased data
-}
+
+Eventually, each \code{Getter} waiting at their \code{MsgBox} receives a control message from the coordinator, revealing to them the identity of their \textit{resource}. The task of each getter is to locate the \code{Space} of this resource, and content with an unknown number of fellow getters to complete the \textit{movement}. All together, this interaction between one resource and $N$ getters is only correct if a number of requirements are satisfied:
+
+\begin{enumerate}
+	\item \textbf{the last getter cleans up the resource}\\
+	Regardless of whether the resource is a \code{Putter} or a memory cell, the set of getters are responsible for cleaning up the resource to finish the interaction. In the case of a putter, this takes the form of sending them a \textit{control message}, notifying them that everyone has finished inspecting their datum and they may return to the caller. Clearly it is unsafe for anyone to release the putter \textit{before} some getter has finished reading the datum; by returning, the putter may \textit{invalidate} the memory region storing the datum.
+	
+	In the case of a memory cell resource, cleanup takes the form of re-setting its \textit{ready flag} inside \code{ProtoCr}, signifying that the memory cell is in a stable state can again be involved in rule firings. This is necessary as there is no dedicated thread guaranteed to set this flag in future, as is the case for getters and putters. Section~\ref{sec:memory_cells} to follow also explains how these memory cells are \textit{emptied} in these events such that they can again store new values. This manipulates the protocol's state, potentially making new rules' guards satisfiable. As such, this last getter must once again acquire the protocol lock and attempt to \textit{coordinate}.
+	
+	\item \textbf{At least $N-1$ getters \code{Clone}}\\
+	Rust generalizes the operation for \textit{replicating} a datum to produce another instance from it. It is idiomatic to rely on the standard trait \code{Clone} with single operation \code{clone} to implement this behavior. This approach covers cases for which there is a non-trivial means of replicating objects; sometimes, performing a bit-wise copy of the structure's shallowest representation is not enough. Consider the example of \code{Arc} (`atomic reference-counted') in Rust's standard library. This type consists of just a pointer to some heap-allocated tuple \code{(count, data)}, and is used for shared, reference-counted ownership of \code{data}. For this type, coping the pointer to the tuple is not sufficient. Cloning must \textit{follow} the pointer and increment \code{count}.
+	
+	\item \textbf{One getter \textit{moves} instead of cloning}\\
+	Data movements represent the \textit{transmission} of data from source to a set of destinations. Generally, the value is no longer present at the source afterwards. Na\"ively, the original must be \textit{destroyed} to complete the interaction. However, it is wasteful and illogical to replicate an object only to destroy the original. Instead, we wish to \textit{move} a value between threads, much as Rust's move semantics allow the movement of affine types between bindings. This cannot be done in the conventional way, as movement is defined is generally within the context of a single thread and scope. Regardless of Rust's expressiveness, it is nonetheless an \textit{action-based} language, and does not offer the \textit{interaction} we need.\footnote{Rust is able to understand uni-directional movement of values into \textit{new} threads using the same mechanism by which closures can \textit{enclose} variables in their parent scope. More complex types are able to also create their own notions of safe `movement' by composing actions as we suggest in this section. As in our case, they require the use of \code{unsafe}, as by definition the Rust compiler cannot reason about their correctness in the usual way.}
+	
+	When orchestrated correctly, we are able to implement a safe \textit{move} operation between threads by invoking a pair of \textit{unsafe} operations, one on either end. In \textit{unsafe Rust} it is possible to \textit{copy} a value without influencing the original. If not done correctly, this can easily lead to \textit{double-frees}. On the other hand, it is possible to leak resource memory with \code{forget}, an operation of Rust's standard library which causes the compiler to consider the value \textit{moved} without invoking \code{drop}. These pitfalls should be familiar to C programmers, as \textit{unsafe Rust} gives one the capability to interact with \textit{raw pointers} in a fashion similar to that of C. Together, these actions constitute the inter-thread move primitive we need.
+	
+	We elaborate our task by requiring an election between getters, such that one is designated the \textit{mover}, and the rest are \textit{cloners}. 
+	
+	\item \textbf{No \code{clone} precedes the move}\\
+	 It is unsafe to \textit{move} a value before or while performing \code{clone} on the original. Consider again the example of type \code{Arc} by examining this sequence of events that results in undefined behavior: (1) \code{Arc} $x$ represented by a pointer to heap region at $p$ is moved to binding $y$. (2) $y$ goes out of scope, it's reference count is reduced to zero, and so its heap allocation is freed. (3) \code{Arc::clone} is invoked with $x$, which traverses its pointer to memory position $p$, and attempts to increment \code{count}. $p$ is no longer allocated, and arbitrary memory corruption ensues. To prevent such cases, Reo-rs must take care to order all clones of some value before it can be moved, as the Rust compiler would do.
+	 
+	 \item \textbf{Signal-getters prefer cloning}\\
+	 As explained in Section~\ref{sec:port_operations}, the API of the \code{Getter} type offers variants of its \code{get} operation with slightly different semantics. Of note are those that communicate a lack of desire to actually acquire and return any datum; the getter is interested only in participating in synchrony. We observe that it is wasteful for such a signal-getter to be elected mover in the event the some \textit{other} getter wanted the datum, and by losing the mover-election, was forced to \code{clone}.
+\end{enumerate}
+
+With all of these requirements in mind, getters meet at the \code{Rendezvous} with fields \code{count} and \code{mover}, initialized to $N$ and \textit{true} by the coordinator a priori respectively. Listing~\ref{listing:get_data} provides Rust-like pseudocode for this procedure from the perspective of some getter. The intuition behind this solution is the observation that eventually exactly one getter will decrement \code{count} for the last time (evaluating \code{count.sub\_fetch(1)} to zero). At this moment, regardless of $N$ of which getters wanted signals, all clones have been completed. 
+
+\begin{listing}[ht]
+	\centering
+	\inputminted{rust}{get_data.rs}
+	\caption[TODO.]{TODO.}
+	\label{listing:get_data}
+\end{listing}
+
+
+Another optimization exists for cases where the data type implements the \code{Copy} trait, communicating that this type has a trivial destructor, and it is perfectly safe for multiple getters to \textit{copy} the data by replicating its shallowest representation in parallel. This is the case for primitives, and structures composed entirely out of primitives, such as arrays of integers. For these types, each getter knows a priori that every getter will conclude that the type implements \code{Copy}, and it can forgo the mover-election business. It is still necessary to elect one getter as the \textit{last} to perform the cleanup (the putter must still be released, or the memory cell must still become ready).
+
+
 
 \subsubsection{Type Reflection}
 \label{type_reflection}
-\hl{a key observation for reo coordinators, is that they actually perform very few operations on the data that are particular to the type. for the most part, it doesnt matter what type the data is. for the purpose of instructions, it needs to only sometimes REPLCATE, create new ALLOCATIONS, DESTROY and check for EQUALITY. for this reason, it makes sense to treat all data the same, and instead REFLECT on its concrete type at runtime when necessary. this is achieved using DYNAMIC DISPATCH
-
-Rust has two main mechanisms for polymorphism: static and dynamic.
-blah blah.
-dynamic dispatch is close to what we need, but comes with two major downsides: you cannot DOWNCAST (make concrete) and they are represented with FAT POINTERS. Instead we have a custom approach which decouples the behavior pointer and the data pointer. this is useful for re-using allocations, using the behavior pointer as a KEY, clustering slots by type. the type pointer is not needed, as Reo knows the type of data movements based on context: movements to getters are always of the same type as the putter.
-}
+WORDS
+%\hl{a key observation for reo coordinators, is that they actually perform very few operations on the data that are particular to the type. for the most part, it doesnt matter what type the data is. for the purpose of instructions, it needs to only sometimes REPLCATE, create new ALLOCATIONS, DESTROY and check for EQUALITY. for this reason, it makes sense to treat all data the same, and instead REFLECT on its concrete type at runtime when necessary. this is achieved using DYNAMIC DISPATCH
+%Rust has two main mechanisms for polymorphism: static and dynamic.
+%blah blah.
+%dynamic dispatch is close to what we need, but comes with two major downsides: you cannot DOWNCAST (make concrete) and they are represented with FAT POINTERS. Instead we have a custom approach which decouples the behavior pointer and the data pointer. this is useful for re-using allocations, using the behavior pointer as a KEY, clustering slots by type. the type pointer is not needed, as Reo knows the type of data movements based on context: movements to getters are always of the same type as the putter.
+%}
 
 
 \begin{listing}[ht]
@@ -283,7 +313,7 @@ To illustrate how our dynamic dispatch system works, we see how the user is able
 
 \subsubsection{Memory Cells}
 \label{sec:memory_cells}
-
-\hl{
-memory cells clearly outlive the stacks of any putters. therefore, the protocol has its own independent persistent memory on the heap. However, it does not use the system allocator directly; data moves through ports very quickly and the overhead of allocating new objects is exceptionally wasteful. instead, we leverage the information made available by the reo specification: we know ahead of time which memory allocations we will need, and we know precisely in which sizes and alignments they will be. we can allocate a fixed number of STORAGE SLOTS and then re=use them. A sensible implementation would simply assign such a slot to each MEMORY CELL SPACE and swap values in and out, initializing and uninitializing the same memory region repeatedly. Clearly, as these memory variables are of irregular sizes, this necessitates a level of indirection: spaces have POINTERS to an allocated heap space. while we are at it, a minor change provides a powerful optimization: we decouple storage slots and memory cells entirely with the addition of a custom ALLOCATOR with REFERENCE COUNTING. when a memory cell moves data to others, only the POINTER moves to its storage slot, and the refcount is updated accordingly. this makes movement and replication within the protocol trivially cheap. it also means that the cost of dropping values is postponed until the last possible moment: the `original' is destroyed only when the LAST memory cell removes its reference.
-}
+WORDS
+%\hl{
+%memory cells clearly outlive the stacks of any putters. therefore, the protocol has its own independent persistent memory on the heap. However, it does not use the system allocator directly; data moves through ports very quickly and the overhead of allocating new objects is exceptionally wasteful. instead, we leverage the information made available by the reo specification: we know ahead of time which memory allocations we will need, and we know precisely in which sizes and alignments they will be. we can allocate a fixed number of STORAGE SLOTS and then re=use them. A sensible implementation would simply assign such a slot to each MEMORY CELL SPACE and swap values in and out, initializing and uninitializing the same memory region repeatedly. Clearly, as these memory variables are of irregular sizes, this necessitates a level of indirection: spaces have POINTERS to an allocated heap space. while we are at it, a minor change provides a powerful optimization: we decouple storage slots and memory cells entirely with the addition of a custom ALLOCATOR with REFERENCE COUNTING. when a memory cell moves data to others, only the POINTER moves to its storage slot, and the refcount is updated accordingly. this makes movement and replication within the protocol trivially cheap. it also means that the cost of dropping values is postponed until the last possible moment: the `original' is destroyed only when the LAST memory cell removes its reference.
+%}
