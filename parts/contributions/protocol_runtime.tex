@@ -108,9 +108,11 @@ Next, we enumerate the requirements which are \textit{qualitative}. By their nat
 
 \section{Protocol Runtime}
 \label{sec:protocol_runtime}
-Here we explore the Reo-rs implementation of Reo protocol objects. 
+Here, we explore the Reo-rs library implementation which provides user-facing types that work together to behave as coordination primitives at runtime in accordance to the imperative-form-like \code{ProtoDef} used to configure them.
 
-\subsection{User-Facing}
+First, Section~\ref{sec:user_facing} explains the functionality of Reo-rs through the lens of the user-facing API. Beyond this surface level, there is a large design space for implementing the internals. As such, this project necessitated the exploration of several of these possibilities before settling on a design. Section~\ref{sec:chosen_design} begins by summarizing these possibilities and motivating the choice for this work. Section~\ref{sec:protocol_object_architecture} details how this design is laid out as more concrete type definitions in the library (most of which the user will never see). Finally, Section~\ref{sec:behavior_implementation} describes how these structures interact to emerge as coordination.
+
+\subsection{Application User Interface}
 \label{sec:user_facing}
 The Reo compiler generates protocol descriptions in imperative form, which then are transformed by Reo-rs into runnable objects. The user therefore interacts mostly with Reo-rs itself, and Reo provides only the entry point for building particularly instances of protocol object. In this section we explain which functionality of Reo-rs is user-facing, focusing primarily on which requirements are satisfied.
 
@@ -153,46 +155,35 @@ Options (1) and (3) are already supported by the methods described thus-far. To 
 
 In sections to follow, we ignore this complication and presume the safer value-passing variants are used only.
 
-\subsection{Internal}
-\label{sec:internal}
-Where Section~\ref{sec:user_facing} explained the functionality of Reo-rs through the lens of the user-facing API, this section explains how \code{Proto} structures work to behave as coordinators at runtime. The user's ignorance provides a vast possibility space for the design. As such, this project necessitated the exploration of several of these possibilities before settling on a design. Section~\ref{sec:chosen_design} begins by summarizing these possibilities and motivating the choice for this work; this section also serves as an entry point, as it gives an overview of the internals at the conceptual level. The sections to follow dive deeper into how this design is realized, starting with describing the layout of \code{Proto} in memory in Section~\ref{sec:protocol_object_architecture}, with Sections~\ref{sec:coordinator_and_interpreter} to~\ref{sec:minimizing_the_bottleneck} describing how operations use this data to manifest as coordination behavior.
-
-\subsubsection{Chosen Design}
+\subsection{Design Process}
 \label{sec:chosen_design}
 Many designs for the implementation of Reo-like coordinators are possible. Their structure and workings all depend on how information is arranged, and how multiple threads come together to coordinate on an a-priori unknown task without stepping on one another's toes. In our case, we concentrate on the case where all participants in the system share a memory address space, which opens up many means of exchanging data between threads. As is typical in multi-threading, the problem is not accessing the data, but rather restraining oneself from accessing the data at the wrong time. Before we can approach any design decisions, we examine what we know for certain: ports invoke \code{put} or \code{get}, each from their own thread. They cannot return immediately, as this would not result in the correct system behavior; when not aligned in time, getters will often (unknowingly) read uninitialized data, and putters will write their data, never to be read. They wish to exchange data in accordance with some defined protocol, but a priori have no knowledge of the protocol, nor their role in it. The aim is to facilitate rule firing `greedily' as opportunity allows: ie.\ we do not wish to delay the firing of some rule $x$ if some $y$ can be fired sooner.
 
+\subsubsection{The Coordinator}
 The most obvious starting point is asking \textit{who decides which rule to fire?} Reaching consensus prevents the system from reaching some mal-formed state where two rules are being committed to in tandem, violating the protocol or deadlocking on some resource they have in common. It is easy to contrive of such examples where numerous ports are involved. For example, consider a case where two rules disagree on which of two putter ports distribute their datum to a set of getters. If not done carefully, some getters may receive one value, and the rest another. The most approachable solution is to stick more closely to the Reo model by introducing a specialized \textit{coordinator} for each protocol. Consensus is trivial when one participant is elected the leader for every circumstance. Unfortunately, we cannot rely on some port $x$ being involved in every rule firing such that they are the coordinator. Many protocols do not have such an $x$ that can be relied upon to be present. The Java back-end solves this problem by adding a fresh `protocol' thread whose task is to \textit{only} coordinate the others. This approach is easy to think about, as there is a clear mapping from threads to roles. However, the protocol thread is not \textit{inherently} coupled to the actions of ports. It has to \textit{wait} for opportunities to coordinate, necessitating the transmission of explicit events from compute-threads to the coordinator. These messages can use a channel, or use something like semaphores or monitors to send \textit{signals} instead, and then relying on the coordinator to \textit{re-discover} which ports are ready by reading the state of shared memory. Next, one must decide \textit{who} organizes the actions into an interaction. The Java backend's approach is to spread ports out over space such that they can become ready concurrently\footnote{Conceptually this could be in parallel, but the actual implementation the exchange necessitates the use of a \textit{class monitor lock} to prevent interfering with the protocol thread itself.}. The coordinator then treats the port structures like messaging pigeonholes, and performs the task of moving data around itself. The coordinator's notification to the ports is subtle; taking the form of \code{put} and \code{get} calls which release port-local locks, unblocking the compute-threads, completing the interaction. This solution is effective, but has some downsides, as discussed in Section~\ref{sec:java_observations}. 
 
-A minor change with the potential for improvement is to remove the necessity of the protocol thread to \textit{re-discover} the nature of the event which generated a wakeup signal. Rather than signals with no payload, we can use \textit{events} which carry explicit information, eg: `Port $x$ is ready to get!'. The Rust ecosystem has a number of libraries for defining event loops built atop system signal handles. An early implementation made use of the \code{mio} crate\footnote{\url{https://crates.io/crates/mio}} for sending events which communicated \textit{which} port has become ready. With this minor change, the coordinator does not need to inspect the contents of ports directly, which, owing to their modification by multiple threads, inherently cause several \textit{cache misses} for the coordinator. Rather, the coordinator is able to manage a private, dense, \textit{redundant} record of which ports are ready. Aside from the unfortunate data duplication, this optimization contributes greatly to the satisfaction of $\boldsymbol{R^N_{fast}}$. Unfortunately, regardless of how fast \code{mio} may be, the event must still cross the boundary between threads. In over-encumbered systems, this has the consequence of causing context switches.
+\subsubsection{Event Handling}
+A minor change with the potential for improvement is to remove the necessity of the protocol thread to \textit{re-discover} the nature of the event which generated a wakeup signal. Rather than signals with no payload, we can use \textit{events} which carry explicit information, eg: `Port $x$ is ready to get!'. With this approach, the coordinator waits in an \textit{event loop}, handling incoming events. The Rust ecosystem has a number of libraries for defining event loops built atop system signal handles. An early implementation made use of the \code{mio} crate\footnote{\url{https://crates.io/crates/mio}} for sending events which communicated \textit{which} port has become ready. With this minor change, the coordinator does not need to inspect the contents of ports directly, which, owing to their modification by multiple threads, inherently cause several \textit{cache misses} for the coordinator. Rather, the coordinator is able to manage a private, dense, \textit{redundant} record of which ports are ready. Aside from the unfortunate data duplication, this optimization contributes greatly to the satisfaction of $\boldsymbol{R^N_{fast}}$. Unfortunately, regardless of how fast \code{mio} may be, the event must still cross the boundary between threads. In over-encumbered systems, this has the consequence of causing context switches.
 
-We observe that the use of an explicit protocol thread manifests in systems with a strange property: Always at least one thread is not doing any meaningful work. To understand why, consider an example protocol which simply forwards data from producer~$P$ to consumer~$C$.
+\subsubsection{Threadless Protocol}
+We observe that the use of an explicit protocol thread manifests in systems with a strange property of rules involving one or more ports: Always at least one thread is not doing any meaningful work. To understand why, consider an example protocol which simply forwards data from producer~$P$ to consumer~$C$. Figure~\ref{fig:sequence_diag} shows a possible sequence of events. The coordinator cannot act until a rule can be fired. As soon as the rule is ready, all the involved ports are blocked. Until the coordinator has finished completing the interaction, all of the rule's threads wait, blocked until the coordinator releases them. Even the most efficient event-handling system cannot help but to make matters worse by adding delays in both directions.
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=8cm]{sequence.png}
+	\caption[TODO]{TODO}
+	\label{fig:sequence_diag}
+\end{figure}
+
+One pivotal decision of our final design is to attempt to alleviate this problem. If compute-threads are going to block, waiting for progress anyway, why not have them do the coordination \textit{themselves}? In our approach, we discard the dedicated protocol thread and re-interpret the coordinator as a \textit{role} which the other threads take turns adopting. Conceptually, this change is a minor one; there is ultimately still at most one thread acting as coordinator. Until now, we have taken for granted that the coordinator can complete interactions with impunity; as they are the only elected leader of their kind, there is no concern for data races. In our new model, if \textit{anyone} can be a coordinator, we must go our of our way to prevent two threads from adopting the role at once. Where before the bottleneck existed (implicitly) as a single coordinator thread processing a sequence of events \textit{one at a time}, we now make the lock explicit: upon becoming ready, every thread attempts to acquire the \textit{protocol lock}, the holder of which acts is the only coordinator for the duration.
+
+\subsubsection{Delegating the Task of Data Exchange}
+Owing to our focus on values at the systems level, we do not have the simplifying luxury of the Java backend to presume that moving data is cheap. In Rust, as in C and C++, values are not represented by indirect references by default; often, their shallowest representations are all there is to them. To satisfy $\boldsymbol{R^N_{data}}$, the Java backend's (admittedly intuitive) representation of ports as data pigeonholes is wasteful. For many realistic Reo protocols, data often moves \textit{through} protocols synchronously, moving from \code{Putter} to \code{Getter} without any storage in memory cells in-between. 
+
+Our implementation introduces a new idea in an attempt to capitalize on this observation: getters fetch their data directly from the \textit{source}. In this approach, the coordinator does necessarily handle data itself. Rather, it decides which rule to fire and \textit{delegates} the task of moving the data to the getters themselves. In addition to skipping a redundant `data hop' from putter to coordinator, this also facilitates the dissemination of a putter's datum to all its getters \textit{in parallel}. This change requires extra messaging form the coordinator, as getters are given more responsibility. Where before a signal from coordinator to getter sufficed (`Your datum is ready!'), coordinators must now communicate the location of the getters' source (`Your datum can be found at $P$!').
 
 
-As a starting point, 
-
-
-java implementation re-discovers every time which rules to fire.
-
-Regardless of how it is done, ultimately Reo-like coordination emerges if all participants in a protocol reach consensus on two things. Of course, many other views on the same problem are possible, but this serves as a starting point that leads naturally to discovery of the design possibilities:
-\begin{enumerate}
-	\item \textit{What} is the interaction?
-	\item \textit{When} do I contribute my action to the interaction?
-\end{enumerate}
-
-Reo's view of coordinating systems takes a simplifying view of treating all components alike. This design is embraced by the the Java implementation, resulting in a very intuitive representation of protocols, where threads correspond 1-to-1 to components, and ports are loci of data exchange. Even for the Java back-end, this symmetry cannot be entirely preserved, as protocols and components have different \textit{roles} in such a system; coordinators are aware of the global state, while compute-components are oblivious of it. Compute components cannot \textit{stay} ignorant of the global state, as deciding the nature and timing of their action necessitates (at least indirectly) finding out about the state. According to Reo's idiom, the Java implementation keeps the compute components at arm's length from a global view of the state; effectively, they communicate information to the \textit{protocol thread}, which makes the global decision and then shares only the information locally needed to the compute-component (namely, the protocol tells when \textit{when} to act by un-blocking them). This exchange of information thus has to cross the boundary from (a) the compute threads, to (b) wherever the coordination decisions are being made. The nature of this communication is important to how the rest of the system develops. We examine three possibilities:
-\begin{enumerate}
-	\item \textbf{Compute thread \textit{sends} its information to the protocol}.\\
-	
-	\item \textbf{Protocol thread \textit{retrieves} the compute-information}.\\
-	
-	\item \textbf{}
-	The compute thread sends a message to the communicator.
-\end{enumerate}
-
-1. who inspects the global state? 
-1. 
-
-\subsubsection{Protocol Object Architecture}
+\subsection{Protocol Object Architecture}
 \label{sec:protocol_object_architecture}
 \code{Proto} is a type corresponding closely to its imperative-form specification type, \code{ProtoDef}. While they represent the same thing, their differences in structure and contents are a result of them being used for different \textit{purposes}. Despite the increase in granularity from Reo's RBA-like form, \code{ProtoDef} still represents a \textit{specification} of the protocol; as such, it strives to minimize redundancy to simplify parsing and minimize the surface for internal inconsistency. On the other hand, \code{Proto} is structured to facilitate \textit{execution} at runtime.
 
@@ -212,6 +203,8 @@ Reo's view of coordinating systems takes a simplifying view of treating all comp
 3. implicit CR: space vector. each associated with a location. each given what they need. putter-space with rendezvous OR messagebox
 }
 
+\subsection{Behavior}
+\label{sec:behavior_implementation}
 
 \subsubsection{Coordinator and Interpreter}
 \label{sec:coordinator_and_interpreter}
