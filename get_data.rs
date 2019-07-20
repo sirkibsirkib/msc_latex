@@ -3,7 +3,7 @@ if want_data {
     if am_mover {
         if count.sub_fetch(1) == 0 { do_move() }
         else { mover_signal.await() }
-        finish();
+        cleanup(was_moved=true);
     } else {
         do_clone();
         if count.sub_fetch(1) == 0 {
@@ -13,8 +13,6 @@ if want_data {
 } else { // want signal only
     if count.sub_fetch(1) == 0 {
         let am_mover = mover.swap(false);
-        if am_mover { // nobody wanted the datum
-            destroy_original();
-            finish();
-        } else { mover_signal.release() }
+        if am_mover { cleanup(was_moved=false) }
+		else { mover_signal.release() }
 }   }
