@@ -317,7 +317,28 @@ Requirements~$\boldsymbol{R^N_{data}}$ and~$\boldsymbol{R^N_{fast}}$ incentivize
 \subsubsection{Type Reflection}
 \label{type_reflection}
 
-As explained in Section~\ref{sec:rust_language}, Rust offers \textit{static dispatch} for monomorphizing generic code when the concrete types are known statically at the call site. This approach is not 
+
+
+
+Section~\ref{sec:rust_language} explains how Rust offers both \textit{static} and \textit{dynamic} dispatch for executing generic code, similar to how it is done for C++. The two options offer a trade-off in runtime speed, binary size and flexibility. The interpreter approach taken by Reo-rs makes it difficult to make effective use of static dispatch, as this requires that the concrete type be known at the \textit{call site}. While it is common for Rust libraries to be written in terms of generic arguments that downstream dependents will monomorphize later, this is not particularly ergonomic in our case, as Reo protocols also have an a priori unknown \textit{number} and \textit{arrangement} of generic data types. Effective static dispatch would be difficult to leverage in combination with the two-step generation introduced in Section~\ref{sec:imperative_form}. 
+
+Section~\ref{sec:rust_language} showed how another solution exists for such cases: \textit{dynamic dispatch}, also called \textit{virtualization}. In this approach, type-specific code is written for generic objects, but rather than propagating their type-instantiation further, the concrete type is \textit{virtualized}, interacted with through virtual function calls by traversing a \textit{virtual function table} at runtime. If applied in our case, precisely one type \code{Proto} is needed regardless of the data types of values passing through ports; any type-specific operations are distinguished by Rust at runtime by traversing \textit{virtual function tables} of the data types to resolve their specific functions. This lookup incurs some extra overhead at runtime, but we argue why this is acceptable for Reo-rs:
+\begin{enumerate}
+	\item \textbf{Only pay for what you use}\\
+	The most significant argument in favor of dynamic dispatch for our case is the observation that the only significant downside, the added overhead to type-specific operations, are seldom incurred. Much of the work performed by the coordinator is agnostic to the data-type. Section~\ref{sec:data_exchange} explains how usually getters perform moves themselves, while coordinators interact with spaces, send messages and compare bit vectors. Furthermore, usually the argument in favor of reducing overhead is in the context of \textit{hot path} computation; one wouldn't use dynamic dispatch to compute force vectors between every pair of atoms in a physics simulation, as these would dominate the computation. Protocols are low level but simply not \textit{that} low.
+	
+	\item \textbf{Reduced binary size}\\
+	In some cases virtualization is able to \textit{increase} performance indirectly by reducing the overall size and heterogeneity of the binary. When a program has enough different port types, static dispatch would (statically) cause a lot of code replication that interacts poorly with the \textit{instruction cache}.
+	
+	\item \textbf{More flexible}\\
+	Dynamic dispatch is a method of relegating the task of distinguishing type behavior to runtime by relying on \textit{data} to distinguish types. Regardless of whether this is done by necessity, this opens up new opportunities for \textit{changing} behavior at runtime. If you change the data, you change the behavior. Projects beyond the scope of this thesis may rely on dynamic dispatch to implement \textit{dynamic reconfiguration}. In a sense, the interpreter approach taken by Reo-rs represents this idea taken to the extreme: changing the contents of the \code{Proto} is able to influence more than just the \textit{types} of protocol rules, but alter them altogether.
+\end{enumerate}
+
+Rust's representation of virtualized types is the \textit{fat pointer}. Where static dispatch has just a single
+
+ Effective use would require the bulk of the code to be generated on a case-by-case basis, as 
+
+\textit{static dispatch} for monomorphizing generic code when the concrete types are known statically at the call site. This approach is not 
 
 The interpreter approach taken by Reo-rs has a consequence: \code{Proto} does not know port data types at compile time. 
 
