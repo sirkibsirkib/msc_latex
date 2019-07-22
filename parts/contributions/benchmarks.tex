@@ -7,9 +7,9 @@
 \begin{landscape}
 \begin{table}[p!]
 	\begin{adjustbox}{width=19cm}
-	\rowcolors{2}{gray!10}{white}
+	\rowcolors{2}{gray!13}{white}
 	\begin{tabular}{l|ll|p{46mm}p{67mm}}
-		\rowcolor{gray!20}
+		\rowcolor{gray!26}
 		Name                  & Connector      & Data Type   & Goal                                                                     & Description                                                                                                                                    \\ \hline
 		seq-fifo1             & fifo1          & Integer     & Tease out Proto overhead                                                 & alternate between putting and getting on single thread. measure RTT. Repeat for different sizes of data. Compare overhead to std::spsc channel \\
 		SIMO clone            & N-replicator   & BigClonable & check if getters are effectively cloning in parallel                     & repeatedly clone from a single putter in parallel                                                                                              \\
@@ -25,7 +25,8 @@
 		parallel              & parallel       & BitCopyable & concoct a scenario where data is moving in parallel as much as possible. &                                                                                                                                               
 	
 \end{tabular}
-\end{adjustbox}	
+\end{adjustbox}
+\caption[TODO]{TODO}	
 \end{table}
 \end{landscape}
 
