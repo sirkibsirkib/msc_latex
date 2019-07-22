@@ -271,7 +271,7 @@ Above, we see how a function can be defined such that it operates on a generic t
 \begin{listing}[ht]
 	\centering
 	\inputminted{rust}{dispatch.rs}
-	\caption[TODO.]{TODO.}
+	\caption[Static vs dynamic dispatch in Rust.]{Static and dynamic dispatch in Rust exemplified. \code{func\_static} shows the former, propagating the type parameter to the caller. \code{func\_dynamic} shows the latter, relying on a virtual function table to resolve the concrete function at runtime. Function \code{main} shows how both appear at the call site.}
 	\label{listing:dispatch}
 \end{listing}
 
