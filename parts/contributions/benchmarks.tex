@@ -3,5 +3,31 @@
 
 \section{Goal}
 \section{Experimental Setup}
+
+\begin{landscape}
+\begin{table}[p!]
+	\begin{adjustbox}{width=19cm}
+	\rowcolors{2}{gray!10}{white}
+	\begin{tabular}{l|ll|p{46mm}p{67mm}}
+		\rowcolor{gray!20}
+		Name                  & Connector      & Data Type   & Goal                                                                     & Description                                                                                                                                    \\ \hline
+		seq-fifo1             & fifo1          & Integer     & Tease out Proto overhead                                                 & alternate between putting and getting on single thread. measure RTT. Repeat for different sizes of data. Compare overhead to std::spsc channel \\
+		SIMO clone            & N-replicator   & BigClonable & check if getters are effectively cloning in parallel                     & repeatedly clone from a single putter in parallel                                                                                              \\
+		SIMO copy             & N-replicator   & BigCopyable & check if copying saves a lot of time vs cloning                          & repeatedly copy from a single putter in parallel                                                                                               \\
+		MO clone              & N-keeper       & BigClonable & Check if waiting for putter adds significant time                        & repeatedly clone from a memcell                                                                                                                \\
+		counting              & binary counter & BigClonable & Check how effective the refcounting is                                   & binary counter circuit, moving memory between cells a hell of a lot. not much firing                                                           \\
+		MO fine 			  & N-keeper fine  & BigClonable & Check if coordinator is the bottleneck                                   & have one rule per getter. each readiness causing a firing.                                                                                     \\
+		bitsets               & N-keeper fine  & BigClonable & fire every time, but after N-1 false guard evals by bitsets              & N-keeper where only the last port and rule are active. effectively have to traverse all these dead rules each time                             \\
+		hashsets              & N-keeper fine  & BigClonable & check if the bitsets themselves helped                                   & repeat bitset experiments, but modify Reo-rs to use stdlib hashsets instead                                                                    \\
+		transform             & transformer    & int, float  & overhead of createfromcall                                               &                                                                                                                                                \\
+		filter                & filter         & int         &                                                                          &                                                                                                                                                \\
+		router                & router         & int         &                                                                          &                                                                                                                                                \\
+		parallel              & parallel       & BitCopyable & concoct a scenario where data is moving in parallel as much as possible. &                                                                                                                                               
+	
+\end{tabular}
+\end{adjustbox}	
+\end{table}
+\end{landscape}
+
 \section{Results}
 \section{Observations}
