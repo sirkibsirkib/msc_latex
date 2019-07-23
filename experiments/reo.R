@@ -3,8 +3,8 @@ setwd("C:/Users/chris/OneDrive/Documents/LaTeX/Msc2/experiments")
 mypng <- function(filename) {
   png(
     filename,
-    width     = 3.3,
-    height    = 3.3,
+    width     = 4,
+    height    = 4,
     units     = "in",
     res       = 1000,
     pointsize = 9
@@ -105,8 +105,8 @@ getters5 = c(14513, 13862, 13880, 14020, 15721, 16185, 15658, 18702, 20822, 3164
 
 mypng("clone_compete_0.png")
 plot(x, getters1/thou, log='', type='l', xlab="clone work units",
-     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=2, lty=2)
-lines(x, getters2/thou, type='l', col=3, lty=3)
+     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1, lty=2)
+lines(x, getters2/thou, type='l', col=2, lty=2)
 lines(x, getters3/thou, type='l', col=3, lty=3)
 lines(x, getters4/thou, type='l', col=4, lty=4)
 lines(x, getters5/thou, type='l', col=5, lty=5)
@@ -116,11 +116,66 @@ dev.off()
 
 mypng("clone_compete_1.png")
 plot(x, getters1/thou, log='xy', type='l', xlab="clone work units",
-     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=3, lty=2)
-lines(x, getters2/thou, type='l', col=3, lty=3)
+     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1, lty=1)
+lines(x, getters2/thou, type='l', col=2, lty=2)
 lines(x, getters3/thou, type='l', col=3, lty=3)
 lines(x, getters4/thou, type='l', col=4, lty=4)
 lines(x, getters5/thou, type='l', col=5, lty=5)
 legend("topleft", legend=1:5 , col=1:5,  ncol=2,
        y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=1:5)
+dev.off()
+
+mypng("clone_compete_2.png")
+plot(x, getters2/getters2, log='xy', type='l', xlab="clone work units",
+     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=2, lty=2)
+lines(x, getters3/getters2, type='l', col=3, lty=3)
+lines(x, getters4/getters2, type='l', col=4, lty=4)
+lines(x, getters5/getters2, type='l', col=5, lty=5)
+legend("topleft", legend=1:5 , col=1:5,  ncol=2,
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=1:5)
+dev.off()
+
+
+
+#########################################################
+### TIME TAKEN FOR TRAVERSING BOGUS RULES
+x = seq(from=0, to=195, by=5);
+
+# false guard
+y1 = c(266, 320, 401, 419, 478, 519, 554, 610, 651, 662, 743, 757,
+       791, 846, 881, 934, 980, 1012, 1058, 1118, 1150, 1642, 1550,
+       1556, 1570, 1613, 1626, 1764, 1782, 1525, 1586, 1660, 1621,
+       1704, 1750, 1765, 1840, 1858, 1899, 1959);
+
+# check false
+y2 = c(240, 354, 439, 528, 723, 725, 817, 901, 1013, 1181, 1541, 1649, 1327,
+       1872, 1593, 1675, 2801, 2748, 2858, 3291, 3143, 2238, 2236, 2457, 2883,
+       2584, 2741, 2804, 2968, 2914, 3281, 3171, 3189, 3310, 3384, 5012,
+       3679, 3861, 3666, 3938);
+
+# 5x5 nested ands
+y3 = c(245, 805, 1959, 2055, 2802, 4219, 4758, 6340, 7473, 11064,
+       7851, 12751, 10694, 10875, 10974, 10919, 12607, 14100, 14769, 17073,
+       15114, 16913, 17482, 19473, 17983, 21433, 21630, 22035, 23387, 27550,
+       27602, 26537, 29749, 29304, 31060, 32466, 32249, 32769, 34042, 35496);
+
+# check alloc
+y4 = c(271, 1845, 3533, 4751, 6293, 8941, 11445, 11088, 12416, 13894,
+       15267, 16816, 18475, 19574, 21496, 22855, 24483, 25874, 29374,
+       29293, 30857, 32457, 33821, 35937, 37297, 38989, 39578, 42063,
+       42334, 47088, 45782, 45958, 45899, 48499, 50892, 54469, 76016,
+       66190, 60281, 61970);
+
+leggy = c("guard", "false", "ands", "alloc");
+mypng("check_time_0.png")
+dat <- matrix(c(y1,y2,y3,y4), ncol=4);
+matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4) #plot
+legend("topleft", legend=leggy , col=1:4,  ncol=2,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:5)
+dev.off()
+
+mypng("check_time_1.png")
+matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, log='y', ylim=c(0.23, 100)) #plot
+legend("bottomright", legend=leggy , col=1:4,  ncol=2,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:4)
 dev.off()
