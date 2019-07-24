@@ -185,3 +185,34 @@ matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, log='y', ylim=c(0.23, 100)
 legend("bottomright", legend=leggy , col=1:4,  ncol=2,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:4)
 dev.off()
+
+
+
+###################################################
+### bitset effectiveness. comparing normal hashset to bitset for the SUBSET operation
+x = c(2^(0:12));
+bits1 = c(92, 94, 91, 76, 128, 102, 83, 104, 111, 118, 138, 141, 240);
+bits5 = c(88, 77, 82, 83, 89, 90, 192, 93, 71, 66, 236, 135, 158);
+bits9 = c(81, 85, 82, 90, 105, 93, 89, 85, 102, 150, 119, 125, 200);
+set1 = c(72, 105, 94, 70, 88, 117, 161, 277, 484, 918, 2027, 3519, 7258);
+set5 = c(66, 124, 96, 122, 179, 513, 838, 1335, 2673, 3986, 11548, 18570, 32123);
+set9 = c(61, 145, 103, 140, 219, 617, 1217, 1919, 2922, 5501, 12790, 23882, 54884);
+
+leggy = c("10% full", "50% full", "90% full")
+
+mypng("bits_0.png")
+dat <- matrix(c(bits1, bits5, bits9), ncol=3);
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
+matplot(x, dat, type = c("l"), lty=1:3, col=1:3, log='x', ylab="run time (ns)", xlab="port index range") #plot
+legend("topleft", legend=leggy , col=1:3,  ncol=1,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
+dev.off()
+
+
+mypng("bits_1.png")
+dat <- matrix(c(set1/bits1, set5/bits5, set9/bits9), ncol=3);
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
+matplot(x, dat, type = c("l"), lty=1:3, col=1:3, log='xy', ylab="speedup", xlab="port index range") #plot
+legend("topleft", legend=leggy , col=1:3,  ncol=1,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
+dev.off()
