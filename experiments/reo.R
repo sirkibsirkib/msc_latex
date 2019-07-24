@@ -173,15 +173,15 @@ y4 = c(271, 1845, 3533, 4751, 6293, 8941, 11445, 11088, 12416, 13894,
 leggy = c("guard", "false", "ands", "alloc");
 mypng("check_time_0.png")
 op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
-dat <- matrix(c(y1,y2,y3,y4), ncol=4);
-matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4) #plot
+dat <- matrix(c(y1-250, y2-250, y3-250, y4-250), ncol=4);
+matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, ylab="overhead (μs)", xlab="unsatisfied rules") #plot
 legend("topleft", legend=leggy , col=1:4,  ncol=2,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:5)
 dev.off()
 
 mypng("check_time_1.png")
 op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
-matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, log='y', ylim=c(0.23, 100)) #plot
+matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, log='y', ylim=c(0.23, 100), ylab="overhead (μs)", xlab="unsatisfied rules") #plot
 legend("bottomright", legend=leggy , col=1:4,  ncol=2,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:4)
 dev.off()
