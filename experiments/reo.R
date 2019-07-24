@@ -3,8 +3,8 @@ setwd("C:/Users/chris/OneDrive/Documents/LaTeX/Msc2/experiments")
 mypng <- function(filename) {
   png(
     filename,
-    width     = 4,
-    height    = 4,
+    width     = 3.4,
+    height    = 3.4,
     units     = "in",
     res       = 1000,
     pointsize = 9
@@ -79,6 +79,7 @@ dev.off()
 
 ### now plotted relative to getters=1
 mypng("simo_copy_1.png")
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
 plot(x, getters2/getters1, log='', type='l', xlab="q for type size = 2^q-1",
      ylim=c(0.8, 20), ylab = "Ratio vs getters=1", col=2, lty=2)
 
@@ -104,6 +105,7 @@ getters4 = c(15510, 12252, 10923, 12419, 13574, 12961, 13218, 15832, 19988, 3345
 getters5 = c(14513, 13862, 13880, 14020, 15721, 16185, 15658, 18702, 20822, 31647, 55072, 92740);
 
 mypng("clone_compete_0.png")
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
 plot(x, getters1/thou, log='', type='l', xlab="clone work units",
      ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1, lty=2)
 lines(x, getters2/thou, type='l', col=2, lty=2)
@@ -115,6 +117,7 @@ legend("topleft", legend=1:5 , col=1:5,  ncol=2,
 dev.off()
 
 mypng("clone_compete_1.png")
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
 plot(x, getters1/thou, log='xy', type='l', xlab="clone work units",
      ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1, lty=1)
 lines(x, getters2/thou, type='l', col=2, lty=2)
@@ -126,13 +129,14 @@ legend("topleft", legend=1:5 , col=1:5,  ncol=2,
 dev.off()
 
 mypng("clone_compete_2.png")
-plot(x, getters2/getters2, log='xy', type='l', xlab="clone work units",
-     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=2, lty=2)
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
+plot(x, getters2/getters2, log='x', type='l', xlab="clone work units",
+     ylim=c(0.5, 8), ylab = "mean sych time (μs)", col=2, lty=2)
 lines(x, getters3/getters2, type='l', col=3, lty=3)
 lines(x, getters4/getters2, type='l', col=4, lty=4)
 lines(x, getters5/getters2, type='l', col=5, lty=5)
-legend("topleft", legend=1:5 , col=1:5,  ncol=2,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=1:5)
+legend("topright", legend=2:5 , col=2:5,  ncol=2,
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=2:5)
 dev.off()
 
 
@@ -168,6 +172,7 @@ y4 = c(271, 1845, 3533, 4751, 6293, 8941, 11445, 11088, 12416, 13894,
 
 leggy = c("guard", "false", "ands", "alloc");
 mypng("check_time_0.png")
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
 dat <- matrix(c(y1,y2,y3,y4), ncol=4);
 matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4) #plot
 legend("topleft", legend=leggy , col=1:4,  ncol=2,
@@ -175,6 +180,7 @@ legend("topleft", legend=leggy , col=1:4,  ncol=2,
 dev.off()
 
 mypng("check_time_1.png")
+op <- par(mar = c(5.1, 4.1, 1.8, 1.8))
 matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, log='y', ylim=c(0.23, 100)) #plot
 legend("bottomright", legend=leggy , col=1:4,  ncol=2,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:4)

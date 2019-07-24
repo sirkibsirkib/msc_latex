@@ -1,0 +1,32 @@
+std::sync::mpsc::spsc_queue::Queue<T,ProducerAddition,ConsumerAddition>::pop:
+		push    rbp
+		mov     rbp, rsp
+		push    r15
+		push    r14
+		push    rbx
+		and     rsp, -32
+		sub     rsp, 864
+		mov     r14, rdi
+		mov     r15, qword ptr [rsi]
+		mov     rax, qword ptr [r15 + 520]
+		test    rax, rax
+		je      .LBB2_3
+		cmp     byte ptr [rax], 2
+		je      .LBB2_2
+		mov     byte ptr [rsp + 288], 2
+		movaps  xmm0, xmmword ptr [rsp + 288]
+		movaps  xmm1, xmmword ptr [rsp + 304]
+		movups  xmm2, xmmword ptr [rax]
+		movaps  xmmword ptr [rsp + 272], xmm2
+		movups  xmm15, xmmword ptr [rax + 16]
+		movups  xmm2, xmmword ptr [rax + 32]
+		movaps  xmmword ptr [rsp + 256], xmm2
+		movups  xmm2, xmmword ptr [rax + 48]
+		movaps  xmmword ptr [rsp + 240], xmm2
+		movups  xmmword ptr [rax + 16], xmm1
+		movups  xmmword ptr [rax], xmm0
+		movups  xmm0, xmmword ptr [rax + 64]
+		movaps  xmmword ptr [rsp + 224], xmm0
+		movups  xmm0, xmmword ptr [rax + 80]
+		movaps  xmmword ptr [rsp + 192], xmm0
+		...
