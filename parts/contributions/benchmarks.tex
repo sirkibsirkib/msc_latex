@@ -125,6 +125,25 @@ Figure~\ref{fig:exper_rtt_01} makes clear that Reo-rs is experiencing overhead t
 	\label{listing:mpsc_pop}
 \end{listing}
 
+Things become more interesting when we apply Reo-rs to more complex problems that actually make use of its more expressive features such as synchrony and state. The \textit{alternator} is a canonical Reo circuit that routes messages from putters $\{P_0, P_1\}$ to getter $G$ in an alternating fashion (starting with $P_0$). The semantics of this connector are subtly different from that of a \textit{sequencer}; namely, the alternator only routes data when all three participants are simultaneously ready, after which $G$ receives a pair of messages in succession. The connector's semantics achieve this by transmitting the first value synchronously, and the dispatching latter asynchronously.
+Listing~\ref{label} shows an implementation of this protocol `by hand' in Rust using \code{Barrier} from the standard library, and the bounded-channel type from the ubiquitous \code{crossbeam} library with bounds~0 and~1 to act as synchronous (\textsc{aka} rendezvous) and asynchronous (\textsc{aka} buffered) channels for data. Figure~\ref{fig:alternator} shows the experimental results. Reo-rs never out-performed the hand-crafted code, but it was never far behind. As seen before, these optimized channels are able to more efficiently move data by using in-lining optimizations, increasing the gap as data gets larger. For values large enough to benefit from it, the figure also shows the speedup achieved by using the \textit{unsafe} reference-passing API, described in Section~\ref{sec:port_operations}.
+
+Reo-rs is designed to handle the expressivity that characterizes the Reo language. The more synchronous and stateful a connector becomes, the more Reo-rs-\textit{like} the handcrafted implementation will be.
+
+\begin{listing}[h!]
+	\centering
+	\inputminted{text}{mpsc_pop.txt}
+	\caption[TODO.]{TODO.}
+	\label{listing:mpsc_pop}
+\end{listing}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.80\textwidth]{experiments/alternator.png}
+	\caption[Hand-crafted vs.\ Reo-generated Alternator.]{TODO.}
+	\label{fig:alternator}
+\end{figure}
+
 \section{Overhead Examined}
 
 \subsection{Port-Operation Parallelism}

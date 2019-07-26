@@ -20,16 +20,15 @@ mypngbig <- function(filename) {
     pointsize = 9
   )
 }
-milis = 1000
 thou = 1000
-bil = 1000000000
+bil = thou*thou*thou
 #####################################################################
 ### RTT. measuring Reo's fifo1 on a single thread vs mpsc
 ### x represents changing data size in bytes (0,1,2,4,8,16)  x gives q where bytes=q&2-1
 ### 100_000 data movements
 ### 10 reps with fresh proto objects
 
-x = 0:14
+x = c(0, 2^(1:14))
 reps = 100000
 reo = c(63.13461, 65.14954, 66.80122, 63.49879, 64.86871, 66.98967, 69.14193,
       69.47564, 76.61765, 89.04745, 114.10968, 134.26562,
@@ -39,19 +38,20 @@ mpsc = c(9.29991, 10.65254, 10.5035, 10.92912, 10.03323, 10.07968, 11.2787,
          69.29128, 163.17103, 276.16403);
 
 mypng("rtt_0.png")
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-plot(x, reo/reps/milis*bil, log='', type='l', xlab="q for type size = 2^q-1",
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat = matrix(c(reo, mpsc), ncol=2)
+matplot(x, dat/reps/thou*bil, log='x', type='b', pch=1:2, xlab="data size (bytes)",
      ylim=c(1, 3010), ylab = "Mean RTT (ns)")
-lines(x, mpsc/reps/milis*bil, type='l', col=2, lty=2)
-legend("topleft", legend=c("fifo1", "mpsc channel") , col=1:2,  ncol=1,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=1:2
+legend("topleft", legend=c("fifo1", "mpsc channel") , col=1:2,  ncol=1, 
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=1:2
 )
 dev.off()
 
 mypng("rtt_1.png")
 op <-par(mar = c(5.1, 4.1, 1.8, 1.8))
-plot(x, reo/reps/milis*bil - mpsc/reps/milis*bil, log='', type='l',
-     xlab="q for type size = 2^q-1", ylim=c(1, 3010), ylab = "fifo1 RTT overhead (ns)")
+dat = matrix(c(reo, mpsc), ncol=2)
+plot(x, (reo-mpsc)/reps/thou*bil, log='x', type='b', pch=3, col=3, lty=3,
+     xlab="data_size (bytes)", ylim=c(1, 3010), ylab = "fifo1 RTT overhead (ns)")
 dev.off()
 
 
@@ -61,44 +61,36 @@ dev.off()
 ### 25_000 data movements
 ### 100 reps with fresh proto objects
 
-x = c(0,4,8,12,16);
-
-
+x = c(0,2^4,2^8,2^12,2^16);
 getters1 = c(532, 544, 570, 990, 6241);
 getters2 = c(941, 979, 1028, 1805, 9336);
 getters3 = c(1712, 1678, 1755, 2534, 10868);
 getters4 = c(9735, 9792, 9781, 11697, 19656);
 getters5 = c(11339, 10450, 11031, 12465, 25713)
 
-
 mypng("simo_copy_0.png")
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-plot(x, getters1/thou, log='', type='l', xlab="q for type size = 2^q-1",
-     ylim=c(0.3, 26), ylab = "Mean sync time (μs)")
-
-
-lines(x, getters2/thou, type='l', col=2, lty=2)
-lines(x, getters3/thou, type='l', col=3, lty=3)
-lines(x, getters4/thou, type='l', col=4, lty=4)
-lines(x, getters5/thou, type='l', col=5, lty=5)
-legend("topleft", legend=1:5 , col=1:5,  ncol=2,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=1:5
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat = matrix(c(getters1, getters2, getters3, getters4, getters5), ncol=5)
+matplot(x, dat/thou, log='x', type='b', pch=1:5, xlab="data size (bytes)", col=1:5, lty=1:5,
+     ylim=c(0.3, 27), ylab = "Mean sync time (μs)")
+revd = rev(1:5)
+legend("topleft", legend=revd , col=revd,  ncol=1,
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd
 )
 dev.off()
 
 
 ### now plotted relative to getters=1
 mypng("simo_copy_1.png")
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-plot(x, getters2/getters1, log='', type='l', xlab="q for type size = 2^q-1",
-     ylim=c(0.8, 20), ylab = "Ratio vs getters=1", col=2, lty=2)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat = matrix(c(getters2/getters1, getters3/getters1, getters4/getters1, getters5/getters1), ncol=4)
+matplot(x, dat, log='x', type='b', pch=2:5, xlab="data size (bytes)",
+     ylim=c(0.8, 20), ylab = "Ratio vs getters=1", col=2:5, lty=2:5)
 
-abline(h=1)
-lines(x, getters3/getters1, type='l', col=3, lty=3)
-lines(x, getters4/getters1, type='l', col=4, lty=4)
-lines(x, getters5/getters1, type='l', col=5, lty=5)
-legend("left", legend=2:5 , col=2:5,  ncol=1,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=2:5
+abline(h=1, col=1, lty=1)
+revd = rev(2:5)
+legend("left", legend=revd , col=revd,  ncol=1,
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd
 )
 dev.off()
 
@@ -115,38 +107,35 @@ getters4 = c(15510, 12252, 10923, 12419, 13574, 12961, 13218, 15832, 19988, 3345
 getters5 = c(14513, 13862, 13880, 14020, 15721, 16185, 15658, 18702, 20822, 31647, 55072, 92740);
 
 mypng("clone_compete_0.png")
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-plot(x, getters1/thou, log='', type='l', xlab="clone work units",
-     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1, lty=2)
-lines(x, getters2/thou, type='l', col=2, lty=2)
-lines(x, getters3/thou, type='l', col=3, lty=3)
-lines(x, getters4/thou, type='l', col=4, lty=4)
-lines(x, getters5/thou, type='l', col=5, lty=5)
-legend("topleft", legend=1:5 , col=1:5,  ncol=2,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=1:5)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat <- matrix(c(getters1, getters2, getters3, getters4, getters5), ncol=5);
+matplot(x, dat/thou, log='xy', type="b", pch=1:5, xlab="clone work units",
+        ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1:5, lty=1:5, xlim=c(4, 12000))
+revd = rev(1:5)
+legend("right", legend=revd , col=revd,  ncol=1,
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd)
 dev.off()
 
 mypng("clone_compete_1.png")
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-plot(x, getters1/thou, log='xy', type='l', xlab="clone work units",
-     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1, lty=1)
-lines(x, getters2/thou, type='l', col=2, lty=2)
-lines(x, getters3/thou, type='l', col=3, lty=3)
-lines(x, getters4/thou, type='l', col=4, lty=4)
-lines(x, getters5/thou, type='l', col=5, lty=5)
-legend("topleft", legend=1:5 , col=1:5,  ncol=2,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=1:5)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat = matrix(c(getters1, getters2, getters3, getters4, getters5), ncol=5)
+matplot(x, dat/thou, log='', type="l", xlab="clone work units",
+     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1:5, lty=1:5)
+revd=rev(1:5)
+legend("topleft", legend=revd , col=revd,  ncol=1,
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=revd)
 dev.off()
 
+
 mypngbig("clone_compete_2.png")
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-plot(x, getters2/getters2, log='x', type='l', xlab="clone work units",
-     ylim=c(0.5, 8), ylab = "mean sych time (μs)", col=2, lty=2)
-lines(x, getters3/getters2, type='l', col=3, lty=3)
-lines(x, getters4/getters2, type='l', col=4, lty=4)
-lines(x, getters5/getters2, type='l', col=5, lty=5)
-legend("topright", legend=2:5 , col=2:5,  ncol=2,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=2:5)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat <- matrix(c(getters3/getters2, getters4/getters2, getters5/getters2), ncol=3);
+matplot(x, dat, log='x', type="b", pch=3:5, xlab="clone work units",
+     ylim=c(0.5, 8), ylab = "synch time relative to getters=2", col=3:5, lty=3:5)
+abline(h=1, col=2)
+revd = rev(3:5)
+legend("topright", legend=revd , col=revd,  ncol=1,
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd)
 dev.off()
 
 
@@ -183,15 +172,15 @@ y4 = c(271, 1845, 3533, 4751, 6293, 8941, 11445, 11088, 12416, 13894,
 leggy = c("guard", "false", "ands", "alloc");
 mypng("check_time_0.png")
  op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat <- matrix(c(y1-250, y2-250, y3-250, y4-250), ncol=4);
-matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, ylab="overhead (μs)", xlab="unsatisfied rules") #plot
-legend("topleft", legend=leggy , col=1:4,  ncol=2,
+dat <- matrix(c(y1-239, y2-239, y3-239, y4-239), ncol=4);
+matplot(x, dat/thou, type="l", lty=1:4, col=1:4, ylab="overhead (μs)", xlab="unsatisfied rules") #plot
+legend("topleft", legend=leggy , col=1:4,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:5)
 dev.off()
 
 mypng("check_time_1.png")
  op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-matplot(x, dat/thou, type = c("l"), lty=1:4, col=1:4, log='y', ylim=c(0.23, 100), ylab="overhead (μs)", xlab="unsatisfied rules") #plot
+matplot(x, dat/thou, type="l", lty=1:4, col=1:4, log='y', ylim=c(0.07, 80), ylab="overhead (ns)", xlab="unsatisfied rules") #plot
 legend("bottomright", legend=leggy , col=1:4,  ncol=2,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:4)
 dev.off()
@@ -213,18 +202,19 @@ leggy = c("10% full", "50% full", "90% full")
 mypng("bits_0.png")
 dat <- matrix(c(bits1, bits5, bits9), ncol=3);
  op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-matplot(x, dat, type = c("l"), lty=1:3, col=1:3, log='x', ylab="run time (ns)", xlab="port index range") #plot
+matplot(x, dat, type="b", pch=1:3, lty=1:3, col=1:3, log='x', ylab="run time (ns)", xlab="number of ports", ylim=c(0, 280)) #plot
 legend("topleft", legend=leggy , col=1:3,  ncol=1,
-       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=1:3)
 dev.off()
 
 
 mypng("bits_1.png")
 dat <- matrix(c(set1/bits1, set5/bits5, set9/bits9), ncol=3);
  op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-matplot(x, dat, type = c("l"), lty=1:3, col=1:3, log='xy', ylab="speedup", xlab="port index range") #plot
+matplot(x, dat, type="b", pch=1:3, lty=1:3, col=1:3, log='xy', ylim=c(0.6, 320), ylab="speedup", xlab="number of ports") #plot
+abline(h=1, lty=3, col=3)
 legend("topleft", legend=leggy , col=1:3,  ncol=1,
-       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=1:3)
 dev.off()
 
 
@@ -252,13 +242,13 @@ dat <- matrix(c(rs0, rs8k, java8), ncol=3);
 leggy = c("rust_8", "rust_8000", "java_8");
 mypng("rust_v_java_0.png")
  op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-matplot(x1, dat/thou, type = "b", pch=1:3, lty=1:3, col=1:3, log='', ylab="interaction duration (μs)", xlab="concurrent getters") #plot
+matplot(x1, dat/thou, type = "l", lty=1:3, col=1:3, log='', ylab="interaction duration (μs)", xlab="concurrent getters") #plot
 legend("topleft", legend=leggy , col=1:3,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
 dev.off()
 mypng("rust_v_java_1.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-matplot(x1, dat/thou, type = "b", pch=1:3, lty=1:3, col=1:3, log='y', ylab="interaction duration (μs)", xlab="concurrent getters") #plot
+matplot(x1, dat/thou, type = "l", lty=1:3, col=1:3, log='y', ylab="interaction duration (μs)", xlab="concurrent getters") #plot
 legend("bottomright", legend=leggy , col=1:3,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
 dev.off()
@@ -274,7 +264,7 @@ mypngbig("rust_v_java_2.png")
 matplot(x2, dat/thou, type = "b", pch=1:3, lty=1:3, col=1:3, log='y', ylab="interaction duration (μs)", xlab="concurrent getters") #plot
 leggy = c("rust_value", "java_reference", "java_value");
 legend("bottomright", legend=leggy , col=1:3,  ncol=1,
-       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=1:3)
 dev.off()
 
 
@@ -287,21 +277,15 @@ x =          c(4,    8,    16,   32,   64,   128,  256,  512,  1024, 2048, 4096)
 y_wrong___ = c(1658, 1620, 1617, 1704, 1698, 1733, 2013, 2014, 2609, 2956, 4529);
 y_handmade = c(1674, 1693, 1700, 1722, 1764, 1728, 1743, 1845, 2077, 2946, 4147);
 y_reorsput = c(1448, 1500, 1475, 1475, 1598, 1583, 1893, 1912, 2281, 3316, 7865);
-dat <- matrix(c(y_handmade, y_reorslib), ncol=2);
+y_crossbea = c(1097, 1198, 1072, 1134, 1060, 1126, 1175, 1347, 1470, 2373, 3454);
+dat <- matrix(c(y_handmade, y_reorsput), ncol=2);
 
-mypng("alternator_0.png")
+mypngbig("alternator.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat = matrix(c(y_crossbea, y_reorsput), ncol=2)
 matplot(x, dat/thou, type = "b", lty=1:3, col=1:3, log='x', ylab="interaction duration (μs)", xlab="data size (bytes)", pch=1:2, ylim=c(0,8)) #plot
 lines(c(1024, 2048, 4096), c(2164, 2941, 6062)/thou, type="b", col=3, pch=3)
-legend("topleft", legend=c("hand made", "reo-rs", "reo-rs (raw API)") , col=1:3,  ncol=1,
-       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
-dev.off()
-
-mypng("alternator_1.png")
-op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-matplot(x, dat/thou, type = "b", lty=1:3, col=1:3, log='xy', ylab="interaction duration (μs)", xlab="data size (bytes)", pch=1:2)
-lines(c(1024, 2048, 4096), c(2164, 2941, 6062)/thou, type="b", col=3, pch=3)
-legend("topleft", legend=c("hand made", "reo-rs", "reo-rs (raw API)") , col=1:3,  ncol=1,
-       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3)
+legend("topleft", legend=c("handmade", "reo-rs", "reo-rs (unsafe reference API)") , col=1:3,  ncol=1,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=1:3)
 dev.off()
 
