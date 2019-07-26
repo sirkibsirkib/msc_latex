@@ -1,0 +1,7 @@
+
+\begin{listing}[ht]
+	\centering
+	\inputminted{rust}{get_data.rs}
+	\caption[Getter procedure for acquiring resource data.]{A getter's procedure for retrieving a value from a putter or memory cell. Getters must coordinate such that one is elected the \textit{mover} with all others cloning. The mover must go last, and once everyone is done, the resource must be cleaned up.}
+	\label{listing:get_data}
+\end{listing}
