@@ -1,11 +1,11 @@
 std::sync::mpsc::spsc_queue::Queue<T,ProducerAddition,ConsumerAddition>::pop:
-		push    rbp
-		mov     rbp, rsp
-		push    r15
-	/* 10 lines omitted */ 
-		je      .LBB2_2
-		mov     byte ptr [rsp + 288], 2
-		movaps  xmm0, xmmword ptr [rsp + 288]
+        push    rbp
+        mov     rbp, rsp
+        push    r15
+    /* 10 lines omitted */ 
+        je      .LBB2_2
+        mov     byte ptr [rsp + 288], 2
+        movaps  xmm0, xmmword ptr [rsp + 288]
         movaps  xmm1, xmmword ptr [rsp + 304]
         movups  xmm2, xmmword ptr [rax]
         movaps  xmmword ptr [rsp + 272], xmm2
@@ -15,4 +15,14 @@ std::sync::mpsc::spsc_queue::Queue<T,ProducerAddition,ConsumerAddition>::pop:
         movups  xmm2, xmmword ptr [rax + 48]
         movaps  xmmword ptr [rsp + 240], xmm2
         movups  xmmword ptr [rax + 16], xmm1
-	/* 163 lines omitted */ 
+        movups  xmmword ptr [rax], xmm0
+        movups  xmm0, xmmword ptr [rax + 64]
+        movaps  xmmword ptr [rsp + 224], xmm0
+        movups  xmm0, xmmword ptr [rax + 80]
+        movaps  xmmword ptr [rsp + 192], xmm0
+        movups  xmm0, xmmword ptr [rax + 96]
+        movaps  xmmword ptr [rsp + 208], xmm0
+        movups  xmm0, xmmword ptr [rax + 112]
+        movaps  xmmword ptr [rsp + 160], xmm0
+        movups  xmm0, xmmword ptr [rax + 128]
+    /* 153 lines omitted */ 
