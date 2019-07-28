@@ -259,68 +259,105 @@ To demonstrate the normalization procedure, Table~\ref{tab:fifo2_rbf_tsa_norm} s
 \end{table}
 
 
-\subsection{Unknown Memory State}
-\hl{TODO}
-TODO I've got some material that goes here but I need to re-distribute some of its contents to earlier sub-sections first.
+\subsection{User-Defined Protocol Simplification}
+Recall, the purpose of a governor is to preserve a system's \textit{liveness}.
+They do this by ensuring that their governed compute component performs port operations that allow the interfacing protocol (and the system around it) to progress. 
+Governors do this by enforcing that their compute component's implementation \textit{covers} each possible transition with code that performs the required task, and ensuring it is chosen correctly in accordance with the wishes of the protocol. Section~\ref{sec:rule_consensus} explains how our type-state automaton represents this by each configuration requiring the definition of a \textit{set} of transitions, one for each action. We say the implementation `covers' each of these cases by defining the component's behavior in each cases, including the invocation of the relevant port operation.
 
-%The design of the governor based on type-state automata discussed thus-far are able to accurately represent the configuration space of \textit{approximated} RBAs, as explained in Section~\ref{sec:approximating_rba}. The design so far also \textit{obliges} the end-user to walk through the projected, normalized automaton in a predefined manner. This is a consequence of the governor removing the compute components' ability to \textit{make decisions} that impact the protocol such that the system reaches consensus, as described in Section~\ref{sec:rule_consensus}. Consider a compute component which interfaces using ports $\{A,B\}$ with a protocol defined by RBF in Table~\ref{tab:counting_rbf}. Generating a governor for this RBA results in a new projected and normalized RBA, shown compared to the original RBA in Figure~\ref{fig:counter_RBAs}. As always, normalization does not change the sequence of ports on which the component must operate, in this case being an infinitely-repeating chain of $[A,A,A,A,B]$. The state space cannot be reduced without losing information; States `000' and `001' have in common that the next several port operations are $A$, but they are still distinguishable. The user must treat these states differently as they are not interchangeable, and thus, do not correspond to interchangeable types. Imagine the user's experience in the case of the similar \textit{512-count cycle} protocol, where their component must distinguish between 512 states!
-%
-%
-%
-%\begin{table}
-%	\centering
-%	\begin{tabular}{l|ll}
-%		rule & guard & assignment \\
-%		\hline
-%		0 & $m_0=*$
-%		& $\gapwedge{}m_0'=d_A$\\
-%		1 & $m_0\neq{}*\wedge{}m_1=*$
-%		& $\gapwedge{}m_1'=m_0\wedge{}m_0'=*$\\
-%		2 & $m_0=m_1\neq{}*\wedge{}m_2=*$
-%		& $\gapwedge{}m_2'=m_0\wedge{}m_0'=m_1'=*$\\
-%		3 & $m_0=m_1=m_2\neq{}*$
-%		& $\gapwedge{}d_B=m_0\wedge{}m_0'=m_1'=m_2'=*$\\
-%		\hline
-%	\end{tabular}
-%	\caption{RBF of the \textit{8-count cycle} connector which uses the full/empty states of its memory cells $m_{0-2}$ as bits for counting in base~2. Rule~3 rolls over to zero and puts a value to port $B$. Every second rule fired is~0, getting a value from port~$A$.}
-%	\label{tab:counting_rbf}
-%\end{table}
-%
-%
-%
-%
-%\begin{figure}[ht]
-%	\centering
-%	\footnotesize
-%	\begin{tikzpicture}
-%	[ inner sep=0.5mm ]
-%	\matrix (m) [ matrix of nodes, row sep=0.5cm, column sep = 0.5cm, 
-%	nodes = {anchor=center,circle, draw=black, thick, fill=gray!10},] {
-%		\node(m0)[initial]{000}; & \node(m1){001}; & \node(m2){010}; & \node(m3){011}; & \node(m4){100}; & \node(m5){101}; & \node(m6){110}; & \node(m7){111};\\
+An overzealous governor which requires to cover \textit{additional} (unnecessary) cases would still serve its purpose. In effect, such a governor would enforce adherence to some \textit{other}, more permissive protocol. However, liberty of the protocol means responsibility to the compute-component: the more the protocol \textit{might do}, the more the compute-component \textit{must consider doing}. There is incentive for governors to do this: permissive protocols are simpler to enforce.
+
+This conservatism becomes a problem when it infringes on the component's ability to express its behavior as intended. Consider the example of a compute-component~$X$ that forwards values from its input port~$A$ to its output port~$B$. Perhaps this component is used in a pipeline as intended such that the component is involved in an endlessly-alternating sequence, represented by regular expression~$(AB)^*$. Perhaps there is a sensible way for $X$ to implement the more permissive protocol which permits~$B$ firings to be omitted, expressed $(A(B|\lambda{}))^*$. $P$ has no problem discarding values input from $A$. However, if the governor takes it a step further such that `anything goes' (expressed $(A|B)^*$), $X$~cannot meaningfully represent its work. How on earth can it forward a message to $B$ before receiving it on~$A$? Not even clairvoyance can help; what if $A$ never fires at all? This is how the user would experience the problem of a governor infringing on the component's own behavior; in a sense,~$P$ has a protocol of its own which must be preserved on its interface ports which the governor violates.
+
+
+
+\begin{table}
+	\centering
+	\begin{tabular}{l|ll}
+		rule & guard & assignment \\
+		\hline
+		0 & $m_0=*$
+		& $\gapwedge{}m_0'=d_A$\\
+		1 & $m_0\neq{}*\wedge{}m_1=*$
+		& $\gapwedge{}m_1'=d_A\wedge{}m_0'=*$\\
+		2 & $m_0=m_1\neq{}*\wedge{}m_2=*$
+		& $\gapwedge{}m_2'=d_A\wedge{}m_0'=m_1'=*$\\
+		3 & $m_0=m_1=m_2\neq{}*$
+		& $\gapwedge{}d_B=m_0\wedge{}m_0'=m_1'=m_2'=*$\\
+		\hline
+	\end{tabular}
+	\caption{RBF of the \textit{a7b1} connector, which is characterized by cycling through a predictable sequence of period~8, where~$A$ inputs seven times and~$B$ outputs once. It works by encoding its configuration in an 8-long cycle as a three-bit integer using the fullness of memory cells $m_{0-2}$.}
+	\label{tab:counting_rbf}
+\end{table}
+
+Nevertheless, there is value in providing a compute-component with a simplified (permissive) view of the protocol where possible. As a motivating example, consider the \textit{a7b1} connector, given as RBF in Table~\ref{tab:counting_rbf}. This connector uses the fullness of three memory cells to count in binary from zero to seven, and cycling back again to zero. Configurations in this cycle are distinguished by specifying different behaviors on~$A$ and~$B$. Here, the projection and normalization of the protocol's RBF is trivial, as no rules are silent. Without the ability to simplify, the~$Y$ must be implemented such that it corresponds exactly with the protocol's (predictable) walk through its approximated configuration space, given in Figure~\ref{fig:counter_RBAs}. As all states are distinguishable, so too are their corresponding \textit{state types} distinct. Now consider this protocol interfacing with some compute-component~$Y$, which is always ready to consume and emit \textit{zero}. Without simplification, the resulting governor would require that the traversal through configuration space be spelled out; the user would be forced to distinguish these states, even though~$Y$ has no need for this specificity. Most likely, the resulting implementation will be repetitive and verbose, if the behavior is the same for configurations `000', `001' and so on. 
+
+\begin{figure}[ht]
+	\centering
+	\footnotesize
+	\begin{tikzpicture}
+	[ inner sep=0.6mm ]
+	\matrix (m) [ matrix of nodes, row sep=0.5cm, column sep = 0.7cm, 
+	nodes = {anchor=center,circle, draw=black, thick, fill=gray!10},] {
+		\node(m0)[initial]{000}; & \node(m1){001}; & \node(m2){010}; & \node(m3){011}; & \node(m4){100}; & \node(m5){101}; & \node(m6){110}; & \node(m7){111};\\
 %		\node(n0)[initial]{000}; & \node(n1){001}; & & \node(n3){011}; & & \node(n5){101}; & & \node(n7){111};\\
-%	};
-%	\draw
-%	(m0) edge[below] node{$A$} (m1)
-%	(m1) edge[below] node{$\cdot$} (m2)
-%	(m2) edge[below] node{$A$} (m3)
-%	(m3) edge[below] node{$\cdot$} (m4)
-%	(m4) edge[below] node{$A$} (m5)
-%	(m5) edge[below] node{$\cdot$} (m6)
-%	(m6) edge[below] node{$A$} (m7)
-%	(m7) edge[bend right, below] node{$B$} (m0)
-%	
-%	(n0) edge[above] node{$A$} (n1)
-%	(n1) edge[above] node[pos=0.84]{$A$} (n3)
-%	(n3) edge[above] node[pos=0.84]{$A$} (n5)
-%	(n5) edge[above] node[pos=0.84]{$A$} (n7)
-%	(n7) edge[bend left, above] node{$B$} (n0)
-%	;
-%	\end{tikzpicture}
-%	\caption{Rules transitioning through configuration space of approximated RBAs for \textit{8-count cycle} connector, with states named after the `count' the three memory cells represent in base~2 for (above) the protocol, and (below) the projected, normalized RBA of the governor for a component with interface $\{A,B\}$.}
-%	\label{fig:counter_RBAs}
-%\end{figure}
+	};
+	\draw
+	(m0) edge[above] node{$A$} (m1)
+	(m1) edge[above] node{$A$} (m2)
+	(m2) edge[above] node{$A$} (m3)
+	(m3) edge[above] node{$A$} (m4)
+	(m4) edge[above] node{$A$} (m5)
+	(m5) edge[above] node{$A$} (m6)
+	(m6) edge[above] node{$A$} (m7)
+	(m7) edge[bend left, above] node{$B$} (m0)
+	;
+	\end{tikzpicture}
+	\caption{Rules transitioning through configuration space of approximated RBAs for \textit{a7b1} connector, with states named after the `count' the three memory cells represent in base~2. Here, the normalization procedure with interface set~$\{A,B\}$ is trivial as no transitions are silent.}
+	\label{fig:counter_RBAs}
+\end{figure}
+
+Our solution to this problem is to introduce a third type, representing the state of a memory cell which may be \textit{either} full or empty:~\code{Unknown} (abbreviated to~\code{U}). Rather than corresponding to a specific configuration of the (approximated) RBA, the governor now reasons about the \textit{set} of states which the protocol may be in. For example, type \code{(UUE)} encapsulates all the concrete configuration types $\{\text{\code{(EEE)}}, \text{\code{(EFE)}}, \text{\code{(FEE)}}, \text{\code{(FFE)}}\}$, and is liable to covering the \textit{union} of the rules applicable to any of those states. In this manner, it is safe for the programmer to arbitrarily `forget' the state of a memory cell, replacing its element in the tuple type with~\code{U}. With this tool in their belt, the implementation of the compute component is able to arbitrarily \textit{unify} the state-types of multiple branches. Our example component~$Y$ above is able to implement its behavior to the satisfaction of its governor with transitions through configuration space in Figure~\ref{fig:weakening}. This weakening can be communicated quite ergonomically, resulting in something very close to what the user would implement themselves: a single loop where the four rules (numbered 0-3) may be applied to configuration type~\code{(UUU)}, each resulting again in~\code{(UUU)}.
+
+
+\begin{figure}[ht]
+	\centering
+	\begin{tikzpicture}[node distance=2cm, inner sep=0.5mm ]
+	\node[state, initial]      (q000) {\texttt{000}};
+	\node[state, below right of=q000] (q???) {\texttt{\textcolor{red}{???}}};
+	\node[state, above right of=q???] (q??1) {\texttt{\textcolor{red}{??}1}};
+	\node[state, below right of=q???] (q?10) {\texttt{\textcolor{red}{?}10}};
+	\node[state, below left of=q???] (q100) {\texttt{100}};
+	\draw
+%	weakenings
+	(q000) edge[dashed, bend left] node{} (q???)
+	(q??1) edge[dashed, bend left] node{} (q???)
+	(q?10) edge[dashed, bend left] node{} (q???)
+	(q100) edge[dashed, bend left] node{} (q???)
+
+%	actual transitions
+	(q???) edge[above left, bend left] node{0} (q??1)
+	(q???) edge[above right, bend left] node{1} (q?10)
+	(q???) edge[below right, bend left] node{2} (q100)
+	(q???) edge[below left, bend left] node{3} (q000)
+	;
+	\end{tikzpicture}
+	\caption{Rules transitioning between configurations of the \textit{a7b1} connector shown in Figure~\ref{fig:counter_RBAs}. Here, the user employs \textit{weakening} to convert (dashed arrows) state tokens to configurations to the configuration-set `???' containing \textit{all} concrete configurations. RBA rules firing are shown with solid arrows, annotated with the rule name, corresponding to those given in Table~\ref{tab:counting_rbf}.}
+	\label{fig:weakening}
+\end{figure}
+
+
+%How can the governor know which distinguishable states the compute components does not wish to distinguish? Our solution is to provide a means for \textit{unifying} 
+%We cannot know a priori which distinguishable states the compute component \textit{wishes} to distinguish. Ideally, the user has an ergonomic means of making this choice themselves. Our solution introduces a means for 
 %
-%The chosen type-state encoding affords a very practical means of \textit{customization} to the implementor of compute components which allows them to further simplify their view of the protocol's automaton. We introduce a third type for a new state memory cells can be in: \code{Unknown}. A type-state with memory cells in an \textit{unknown} state is obliged to cover the \textit{union} of all its concrete possibilities. For example, \code{(Empty, Unknown)} may result in any states either \code{(Empty, Empty)} or \code{(Empty, Full)} may result in. With this definition, it is perfectly correct for a state-type to be `weakened', converting it into a new state-type, identical but with any of its tuple-elemets replaced by \code{Unknown}. In a sense, this approach has type-states no longer corresponding with configurations 1-to-1, but rather, each type-state encodes a simple predicate such that it represents a \textit{set} of configurations. For example, \code{(Unknown, Unknown)} represents \textit{any} configuration (of an RBA with two memory cells). Conceptually, this change has no influence on the way a governor computes which rules are applicable next, but the programmer is empowered with the ability to trade \textit{specificity} for \textit{brevity} in their compute-component implementations. Figure~\ref{fig:weakening} shows an example of how the programmer may choose to traverse their configuration space for the same connector as in the example above. In this case, using \textit{weakening} does not reduce the number of type-states encountered in the implementation; this is only the result of (a) the original RBA not being very complicated, and (b) the choice to only \textit{partially} weaken some states (It is also possible to weaken everything to \code{(Unknown, Unknown, Unknown)} and then match all rules).
+%
+%We currently consider memory variables of the binary domain, ie.\ each is either in state~\code{Full} or~\code{Empty}. We introduce a third state with type \code{Unknown}. Conceptually, configurations with \code{Unknown}-state memory cells represent protocol configurations where each is either concretely full or empty, ie.\ the governor `cannot remember'. 
+%
+%
+%Section~\ref{sec:rule_consensus} describes how the Governor must already be prepared to handle configurations for which there are multiple possible \textit{next} transitions. By adding 
+%
+%As far as the compiler is concerned, \code{Unknown} is just another state, as distinct from \code{Empty} or \code{Full} as any other. Conceptually, we use \code{Unknown} to represent th
+%
+%type for a new state memory cells can be in to supplement existing types \code{Empty} and~\code{Full}:~\code{Unknown}. A type-state with memory cells in an \textit{unknown} state is obliged to cover the \textit{union} of all its concrete possibilities. For example, \code{(Empty, Unknown)} may result in any states either \code{(Empty, Empty)} or \code{(Empty, Full)} may result in. With this definition, it is perfectly correct for a state-type to be `weakened', converting it into a new state-type, identical but with any of its tuple-elemets replaced by \code{Unknown}. In a sense, this approach has type-states no longer corresponding with configurations 1-to-1, but rather, each type-state encodes a simple predicate such that it represents a \textit{set} of configurations. For example, \code{(Unknown, Unknown)} represents \textit{any} configuration (of an RBA with two memory cells). Conceptually, this change has no influence on the way a governor computes which rules are applicable next, but the programmer is empowered with the ability to trade \textit{specificity} for \textit{brevity} in their compute-component implementations. Figure~\ref{fig:weakening} shows an example of how the programmer may choose to traverse their configuration space for the same connector as in the example above. In this case, using \textit{weakening} does not reduce the number of type-states encountered in the implementation; this is only the result of (a) the original RBA not being very complicated, and (b) the choice to only \textit{partially} weaken some states (It is also possible to weaken everything to \code{(Unknown, Unknown, Unknown)} and then match all rules).
 %
 %
 %\begin{figure}[ht]
