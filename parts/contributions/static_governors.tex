@@ -82,7 +82,7 @@ Until anonymous sum types are supported, our solution to the problem of represen
 \hl{TODO}
 
 \section{Making it Practical}
-\hl{TODO}
+With a basic outline for the implementation, we are able to realize some functional, yet na\"ive governors. However, there is a long way to go before these systems can be applied in any realistic scenario. In this section, we explain which problems remain to be solved, whether for the sake of managing complexity, or for the user's ergonomics.
 
 \subsection{Approximating the RBA}
 \hl{TODO}
@@ -299,8 +299,7 @@ Nevertheless, there is value in providing a compute-component with a simplified 
 	[ inner sep=0.6mm ]
 	\matrix (m) [ matrix of nodes, row sep=0.5cm, column sep = 0.7cm, 
 	nodes = {anchor=center,circle, draw=black, thick, fill=gray!10},] {
-		\node(m0)[initial]{EEE}; & \node(m1){EEF}; & \node(m2){EFE}; & \node(m3){EFF}; & \node(m4){FEE}; & \node(m5){FEF}; & \node(m6){FFE}; & \node(m7){FFF};\\
-%		\node(n0)[initial]{000}; & \node(n1){001}; & & \node(n3){011}; & & \node(n5){101}; & & \node(n7){111};\\
+		\node(m0)[initial]{\texttt{EEE}}; & \node(m1){\texttt{EEF}}; & \node(m2){\texttt{EFE}}; & \node(m3){\texttt{EFF}}; & \node(m4){\texttt{FEE}}; & \node(m5){\texttt{FEF}}; & \node(m6){\texttt{FFE}}; & \node(m7){\texttt{FFF}};\\
 	};
 	\draw
 	(m0) edge[above] node{$A$} (m1)
