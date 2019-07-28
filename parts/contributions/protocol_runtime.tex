@@ -77,50 +77,78 @@ It is very easy to see the correspondence between a generated Java protocol and 
 	
 \end{enumerate}
 
-\section{Requirements}
-The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. In this section, we lay out the requirements for Reo-rs. These requirements serve a dual purpose; firstly, it serves to structure the argumentation in sections to follow, primarily linking design choices together by providing over-arching motivations. Secondly, it provides a lens through which to view the work to follow, particularly for helping future readers to identify differences in their requirements such that different decisions can be made.
+\section{Requirements and Guidelines Defined}
+\label{sec:requirements_defined}
+The Reo compiler's Java code generator were examined in Section~\ref{sec:java_examined}, resulting in the extraction of some high-level observations, enumerated in Section~\ref{sec:java_observations}. Our goal is to build upon what exists, and to improve where possible. The goal of this section is to make concrete the priorities behind the design process of Reo-rs. This serves a dual purpose: (1) Their existence helps guide the design process of Reo-rs, helping to make design decisions and making the reader cognizant of the library's priorities. (2) Readers most interested in the finished product are able to use the evaluation in Section~\ref{sec:requirements_evaluated} as a means of overviewing the chapter.
 
-\subsection{Requirements Defined}
-First, we enumerate and name the most vital \textbf{functional requirements} for the Reo-rs library. These requirements determine \textit{what} functionality must be available to the end user of protocols and ports, and which safety properties must be preserved.
+First, we identify a number of functional requirements. These determine the functionality that Reo-rs prioritizes, and which safety properties the end user is able to rely upon.
+
+
+%\begin{landscape}
+%\begin{table}[p!]
+%\begin{adjustbox}{width=19cm}
+%\rowcolors{2}{gray!13}{white}
+%\begin{tabular}{l|p{76mm}|p{137mm}}
+%\rowcolor{gray!26}
+%Name & Definition & Satisfation \\ \hline \hline
+%$\boldsymbol{R^F_{correct}}$ & 
+%Preserve Reo's value passing semantics. No user interaction should contradict these semantics. This precludes data races as a result of \textit{mutably aliasing} resources which the user considers to be independent values.
+%&
+%Values passing through ports preserve value passing. This is achieved even in the presence of reference-passing optimizations `under the table' by leaning on the same philosophy that Rust uses to prevent data races: prohibit mutable aliasing. Objects are only aliased (accessible via multiple bindings) if they should be identical. Section~\ref{sec:port_operations} explains how we prohibit aliasing into and out of the protocol by relying on value-passing port operations. On the other hand, Reo-rs aliases values, but only \textit{until} they are mutated. Section~\ref{sec:memory_cells} explains how memory values are safely aliased. \hl{TODO refer to the section that treats transform functions}
+%\\
+%
+%$\boldsymbol{R^F_{init}}$ &
+%Prevent the protocol from being initialized in an inconsistent state. Prevent port objects from being unitialized, unsafely accessed in parallel, or incorrectly connected to the protocol.
+%& 
+%Section~\ref{sec:user_facing} explains how users are shielded from the granular initialization procedure by exposing an API with explicit constructor functions \code{build} and \code{claim} of protocols and ports respectively. Protocol objects are extensively customizable by the expressiveness of \textit{imperative form}, with which \code{build} is parameterized. At the same time, these structures are kept internally-consistent by the preservation of invariants, and relying on \code{build} as the only user-facing means of instantiation.
+%\\
+%
+%$\boldsymbol{R^F_{ffi}}$ &
+%Facilitate a foreign function interface with other systems languages C and C++. Ports and protocol objects should be accessible from those languages as well as Rust, such that they can be constructed, used and destroyed.
+%&
+%C and C++ foreign-function interfaces are provided by relying simply declarations with the C ABI where possible. As C cannot support Rust's notion of generics, where necessary, the \code{ffi} module provides generic-free alternatives for data types and functions where generics are represented as data instead. Reo-rs can thus be compiled once into either a statically- or dynamically-linked library for use in these other languages without any additional runtime overhead.
+%\\ \hline \hline
+%%---------------------------------------------
+%
+%$\boldsymbol{R^N_{data}}$ & 
+%Allow the transmission of large data types without requiring the user to move the from the stack to the heap. Minimize the number of times data must be \textit{moved} in memory such that data transmission remains performant for types with large representations.
+%& 
+%Reo-rs facilitates the transmission of any fixed-size data-types by value. This permits but does require data to be heap-allocated. Sections~\ref{sec:data_exchange} and~\ref{sec:memory_cells} explains how Reo-rs has a value-passing API, but relies on reference-passing to minimize the number of times values are moved in memory
+%\\
+%
+%$\boldsymbol{R^N_{fast}}$ & 
+%Minimize the overhead of \textit{control operations} for the protocol object to route payloads and perform bookkeeping. In particular, minimize the cost of \textit{evaluating} the rules before one is selected for firing.
+%& 
+%Section~\ref{sec:chosen_design} explains Reo-rs coordinates the actions of multiple threads while minimizing the overhead of inter-thread communications. Section~\ref{sec:minimizing_the_bottleneck} explains how meta-operations are represented such that they can be batched, allowing the coordinator to reduce the overhead of processing rules for firing.
+%\\
+%
+%$\boldsymbol{R^N_{end}}$ &
+%Facilitate the protocol object being destroyed and its resources freed. Facilitate a means of detecting termination which is correct and ergonomic.
+%&
+%Section~\ref{sec:chosen_design} explains how protocol objects are not given their own threads, trivially facilitating termination detection if no ports remain to interact with it. Section~\ref{sec:construction_and_destruction} describes how protocol structures are implicitly cleaned up once all of their ports are destroyed.  
+%\end{tabular}
+%\end{adjustbox}
+%\caption[TODO]{TODO}	
+%\end{table}
+%\end{landscape}
 
 \begin{enumerate}
-	\item[$\boldsymbol{R^F_{correct}}$] Preserve Reo's value passing semantics. No user interaction should contradict these semantics. This precludes data races as a result of \textit{mutably aliasing} resources which the user considers to be independent values.
+	\item[$\boldsymbol{R_{value}}$] Preserve Reo's value passing semantics. No user interaction should contradict these semantics. This precludes data races as a result of \textit{mutably aliasing} resources which the user considers to be independent values.
 	
-	\item[$\boldsymbol{R^F_{init}}$] Prevent the protocol from being initialized in an inconsistent state. Prevent port objects from being unitialized, unsafely accessed in parallel, or incorrectly connected to the protocol.
+	\item[$\boldsymbol{R_{init}}$] Prevent the protocol from being initialized in an inconsistent state. Prevent port objects from being unitialized, unsafely accessed in parallel, or incorrectly connected to the protocol.
 	
-	\item[$\boldsymbol{R^F_{ffi}}$] Facilitate a foreign function interface with other systems languages C and C++. Ports and protocol objects should be accessible from those languages as well as Rust, such that they can be constructed, used and destroyed.
+	\item[$\boldsymbol{R_{ffi}}$] Facilitate a foreign function interface with other systems languages C and C++. Ports and protocol objects should be accessible from those languages as well as Rust, such that they can be constructed, used and destroyed.
 \end{enumerate}
 
-Next, we enumerate the requirements which are \textit{qualitative}. By their nature, they cannot be met absolutely. Rather, they serve to guide the design of the implementation to prioritize the design decisions they affect. For those associated with run time, Chapter~\ref{sec:benchmarking} will assess the extent to which these goals are met.
-
+Furthermore, we identify \textit{guidelines} for softer, qualitative properties of the implementation of Reo-rs. These primarily address matters of feature priority, and provide a basis for making the assumptions necessary for meaningful optimization. The Java implementation is the closest parallel to Reo-rs for performance, and is far too different to form the basis of any thorough quantitative testing. Hence, these guidelines are not formulated such that they can be absolutely satisfied. Instead, performance benchmarking in Chapter~\ref{sec:benchmarking} \textit{motivates} the extent to which the guidelines are followed by Reo-rs.
 \begin{enumerate}
-	\item[$\boldsymbol{R^N_{data}}$] Allow the transmission of large data types without requiring the user to move the from the stack to the heap. Minimize the number of times data must be \textit{moved} in memory such that data transmission remains performant for types with large representations.	
+	\item[$\boldsymbol{G_{data}}$] Allow the transmission of large data types without requiring the user to move the from the stack to the heap. Minimize the number of times data must be \textit{moved} in memory such that data transmission remains performant for types with large representations.	
 	
-	\item[$\boldsymbol{R^N_{fast}}$] Minimize the overhead of \textit{control
-	operations} for the protocol object to route payloads and perform bookkeeping. In particular, minimize the cost of \textit{evaluating} the rules before one is selected for firing.
+	\item[$\boldsymbol{G_{fast}}$] Minimize the overhead of \textit{control operations} for the protocol object to route payloads and perform bookkeeping. In particular, minimize the cost of \textit{evaluating} the rules before one is selected for firing.
 	
-	
-	\item[$\boldsymbol{R^N_{end}}$] Facilitate the protocol object being destroyed and its resources freed. Facilitate a means of detecting termination which is correct and ergonomic.
+	\item[$\boldsymbol{G_{end}}$] Facilitate the protocol object being destroyed and its resources freed. Facilitate a means of detecting termination which is correct and ergonomic.
 \end{enumerate}
 
-\subsection{Requirements Evaluated}
-\hl{TODO}
-
-
-\begin{enumerate}
-	\item[$\boldsymbol{R^F_{correct}}$] Values passing through ports preserve value passing. This is achieved even in the presence of reference-passing optimizations `under the table' by leaning on the same philosophy that Rust uses to prevent data races: prohibit mutable aliasing. Objects are only aliased (accessible via multiple bindings) if they should be identical. Section~\ref{sec:port_operations} explains how we prohibit aliasing into and out of the protocol by relying on value-passing port operations. On the other hand, Reo-rs aliases values, but only \textit{until} they are mutated. Section~\ref{sec:memory_cells} explains how memory values are safely aliased. \hl{TODO refer to the section that treats transform functions}
-	
-	\item[$\boldsymbol{R^F_{init}}$] Section~\ref{sec:user_facing} explains how users are shielded from the granular initialization procedure by exposing an API with explicit constructor functions \code{build} and \code{claim} of protocols and ports respectively. Protocol objects are extensively customizable by the expressiveness of \textit{imperative form}, with which \code{build} is parameterized. At the same time, these structures are kept internally-consistent by the preservation of invariants, and relying on \code{build} as the only user-facing means of instantiation.
-	
-	\item[$\boldsymbol{R^F_{ffi}}$] C and C++ foreign-function interfaces are provided by relying simply declarations with the C ABI where possible. As C cannot support Rust's notion of generics, where necessary, the \code{ffi} module provides generic-free alternatives for data types and functions where generics are represented as data instead. Reo-rs can thus be compiled once into either a statically- or dynamically-linked library for use in these other languages without any additional runtime overhead.
-	
-	\item[$\boldsymbol{R^N_{data}}$] Reo-rs facilitates the transmission of any fixed-size data-types by value. This permits but does require data to be heap-allocated. Sections~\ref{sec:data_exchange} and~\ref{sec:memory_cells} explains how Reo-rs has a value-passing API, but relies on reference-passing to minimize the number of times values are moved in memory.
-	
-	\item[$\boldsymbol{R^N_{fast}}$] Section~\ref{sec:chosen_design} explains Reo-rs coordinates the actions of multiple threads while minimizing the overhead of inter-thread communications. Section~\ref{sec:minimizing_the_bottleneck} explains how meta-operations are represented such that they can be batched, allowing the coordinator to reduce the overhead of processing rules for firing.
-	
-	
-	\item[$\boldsymbol{R^N_{end}}$] Section~\ref{sec:chosen_design} explains how protocol objects are not given their own threads, trivially facilitating termination detection if no ports remain to interact with it. Section~\ref{sec:construction_and_destruction} describes how protocol structures are implicitly cleaned up once all of their ports are destroyed. 
-\end{enumerate}
 
 \section{Protocol Runtime}
 \label{sec:protocol_runtime}
@@ -382,3 +410,22 @@ Our internal use of dynamic dispatch is not visible to the user. The API of putt
 	\label{listing:reflection2}
 \end{listing}
 
+
+\section{Requirements and Guidelines Evaluated}
+\label{sec:requirements_evaluated}
+In this section, we give a summary of the means by which the requirements and guidelines of Section~\ref{sec:requirements_defined} are satisfied and adhered to respectively. This section serves as an overview of this chapter at large, motivating its points by referring to the relevant subsections above.
+
+
+\begin{enumerate}
+	\item[$\boldsymbol{R_{value}}$] Values passing through ports preserve value passing. This is achieved even in the presence of reference-passing optimizations `under the table' by leaning on the same philosophy that Rust uses to prevent data races: prohibit mutable aliasing. Objects are only aliased (accessible via multiple bindings) if they should be identical. Section~\ref{sec:port_operations} explains how we prohibit aliasing into and out of the protocol by relying on value-passing port operations. On the other hand, Reo-rs aliases values, but only \textit{until} they are mutated. Section~\ref{sec:memory_cells} explains how memory values are safely aliased. \hl{TODO refer to the section that treats transform functions}
+	
+	\item[$\boldsymbol{R_{init}}$] Section~\ref{sec:user_facing} explains how users are shielded from the granular initialization procedure by exposing an API with explicit constructor functions \code{build} and \code{claim} of protocols and ports respectively. Protocol objects are extensively customizable by the expressiveness of \textit{imperative form}, with which \code{build} is parameterized. At the same time, these structures are kept internally-consistent by the preservation of invariants, and relying on \code{build} as the only user-facing means of instantiation.
+	
+	\item[$\boldsymbol{R_{ffi}}$] C and C++ foreign-function interfaces are provided by relying simply declarations with the C ABI where possible. As C cannot support Rust's notion of generics, where necessary, the \code{ffi} module provides generic-free alternatives for data types and functions where generics are represented as data instead. Reo-rs can thus be compiled once into either a statically- or dynamically-linked library for use in these other languages without any additional runtime overhead.
+	
+	\item[$\boldsymbol{G_{data}}$] Reo-rs facilitates the transmission of any fixed-size data-types by value. This permits but does require data to be heap-allocated. Sections~\ref{sec:data_exchange} and~\ref{sec:memory_cells} explains how Reo-rs has a value-passing API, but relies on reference-passing to minimize the number of times values are moved in memory.
+	
+	\item[$\boldsymbol{G_{fast}}$] Section~\ref{sec:chosen_design} explains Reo-rs coordinates the actions of multiple threads while minimizing the overhead of inter-thread communications. Section~\ref{sec:minimizing_the_bottleneck} explains how meta-operations are represented such that they can be batched, allowing the coordinator to reduce the overhead of processing rules for firing.
+	
+	\item[$\boldsymbol{G_{end}}$] Section~\ref{sec:chosen_design} explains how protocol objects are not given their own threads, trivially facilitating termination detection if no ports remain to interact with it. Section~\ref{sec:construction_and_destruction} describes how protocol structures are implicitly cleaned up once all of their ports are destroyed. 
+\end{enumerate}
