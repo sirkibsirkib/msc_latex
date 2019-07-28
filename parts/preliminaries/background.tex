@@ -1,41 +1,43 @@
 
 \chapter{Background}
+\label{sec:background}
 \section{Reo}
 \label{sec:reo_background}
-Reo is a high-level language for specifying protocols. Here, we explore the motivation behind Reo's development, how the language is used, and (at high level) how it works. 
+Reo is a high-level language for specifying protocols. Here, we explore the motivation behind Reo's development, and how the language is used.
 The Reo language has applicability whenever there is a benefit in being able to formalize a communication protocol. However, this work primarily focuses on Reo's role in automatic generation of glue-code for applications.  
 
 \subsection{Motivation}
 \label{sec:reo_motivation}
-TODO focus on safety properties
-
-Modern software development involves the construction of large and complex projects. Owing to their scale and the heterogeneity of the tasks required, many people are involved in the development of a program at once, and over its development lifetime. The industry has long-since established paradigms for managing the scale of these projects. One tenet of good software design is \textit{modularity}, which describes a structure that, instead of being designed monolithically, is built out of smaller constituent modules. In addition to isolating modules such that they can be re-used in other projects, this design philosophy allows contributors to concentrate on a subset of all the modules at a time. These ideas are well-established in practice; code re-use and separation-of-concerns have been prevalent for some time.
-
-Reo's utility is not only its ability to facilitate modularity. Reo is designed such that properties of the individual modules are \textit{preserved} when modules are \textit{composed} into larger ones. This preservation marks the difference between \textit{gluing} modules together (and hoping for the best), and \textit{composing} them into something guaranteed to have the intended properties. 
+\hl{TODO}
+%TODO focus on safety properties
+%
+%Modern software development involves the construction of large and complex projects. Owing to their scale and the heterogeneity of the tasks required, many people are involved in the development of a program at once, and over its development lifetime. The industry has long-since established paradigms for managing the scale of these projects. One tenet of good software design is \textit{modularity}, which describes a structure that, instead of being designed monolithically, is built out of smaller constituent modules. In addition to isolating modules such that they can be re-used in other projects, this design philosophy allows contributors to concentrate on a subset of all the modules at a time. These ideas are well-established in practice; code re-use and separation-of-concerns have been prevalent for some time.
+%
+%Reo's utility is not only its ability to facilitate modularity. Reo is designed such that properties of the individual modules are \textit{preserved} when modules are \textit{composed} into larger ones. This preservation marks the difference between \textit{gluing} modules together (and hoping for the best), and \textit{composing} them into something guaranteed to have the intended properties. 
 
 \subsection{Language}
 \label{sec:reo_lang}
-Reo is a \textit{coordination} language. This describes its focus on the specification of the \textit{interactions} between distinct actors. This is in contrast to the usual \textit{action-centric} model common to languages with their roots in sequential programming, where the programs or specifications describe \textit{actions} of entities, relegating any associated interactions to requiring derivation from the actions. In a nutshell, Reo provides a language for describing the behavior of a \textit{system} of actors by explicitly constraining the behavior of the \textit{connector} which serves as their communication medium. 
-
-(TODO define connector. same as component just maybe structural?)
-
-The Reo language is essentially graphic; each connector defines a relation over named \textit{locations}. Complex connectors are defined as the composition of simpler connectors over its locations. This inherently visual language is also often seen in its textual form, usually in the context of machine parsing. 
-
-The simplest \textit{primitive} connectors cannot be subdivided
-
-by listing a set of constituent connectors. The simplest primitive Reo connectors are \textit{channels}(TODO channel vs primitive). Channels by definition cannot be subdivided into constituent connectors, as they are defined by either (a) the model that provides Reo's semantics, or (b) opaque components defined in some target language such as C or Java. The nodes themselves are the other important aspect of the language. Ultimately, each node corresponds to a (logical) location which may hold up to one datum at a time. Reo is by default \textit{synchronous}, and relationships between locations propagates that synchrony. \textit{Locations} are divided into two classes according to whether 
-
-(TODO)
-
-This motivates the Reo's metaphor of propagation of data and back-propagation of data-constraints, corresponding to its namesake, the Greek word for `flow'. The compositional aspect is meaningful when locations are involved in multiple relationships.
-
-\textit{forwards} (by moving data several `hops' at once) and backwards
-
-In addition to re-using nodes inside a connector, connectors are able to expose these nodes for re-use in the connectors \textit{above them} by exposing the node in the connector's \textit{interface}. These exposed nodes are called \textit{ports}, leaning on the metaphor of the connector \textit{moving} some data in and out of itself.
-
-(data flow corresponds with what happens at runtime, except its SYNCHRONOUS by default. Relate to TDS. Talk about replication and equality checks).
-
-(In the context of applications, components that cannot be composed compile to things managed by different threads. at the boundaries, they communicate with ports. Here, there is a meaningful difference between putter and getter. Include example of how a protocol that uses some port A three times still results in a putter-getter pair)
+\hl{TODO}
+\hl{TODO textual and visual examples eg: alternator}
+%Reo is a \textit{coordination} language. This describes its focus on the specification of the \textit{interactions} between distinct actors. This is in contrast to the usual \textit{action-centric} model common to languages with their roots in sequential programming, where the programs or specifications describe \textit{actions} of entities, relegating any associated interactions to requiring derivation from the actions. In a nutshell, Reo provides a language for describing the behavior of a \textit{system} of actors by explicitly constraining the behavior of the \textit{connector} which serves as their communication medium. 
+%
+%(TODO define connector. same as component just maybe structural?)
+%
+%The Reo language is essentially graphic; each connector defines a relation over named \textit{locations}. Complex connectors are defined as the composition of simpler connectors over its locations. This inherently visual language is also often seen in its textual form, usually in the context of machine parsing. 
+%
+%The simplest \textit{primitive} connectors cannot be subdivided
+%
+%by listing a set of constituent connectors. The simplest primitive Reo connectors are \textit{channels}(TODO channel vs primitive). Channels by definition cannot be subdivided into constituent connectors, as they are defined by either (a) the model that provides Reo's semantics, or (b) opaque components defined in some target language such as C or Java. The nodes themselves are the other important aspect of the language. Ultimately, each node corresponds to a (logical) location which may hold up to one datum at a time. Reo is by default \textit{synchronous}, and relationships between locations propagates that synchrony. \textit{Locations} are divided into two classes according to whether 
+%
+%This motivates the Reo's metaphor of propagation of data and back-propagation of data-constraints, corresponding to its namesake, the Greek word for `flow'. The compositional aspect is meaningful when locations are involved in multiple relationships.
+%
+%\textit{forwards} (by moving data several `hops' at once) and backwards
+%
+%In addition to re-using nodes inside a connector, connectors are able to expose these nodes for re-use in the connectors \textit{above them} by exposing the node in the connector's \textit{interface}. These exposed nodes are called \textit{ports}, leaning on the metaphor of the connector \textit{moving} some data in and out of itself.
+%
+%(data flow corresponds with what happens at runtime, except its SYNCHRONOUS by default. Relate to TDS. Talk about replication and equality checks).
+%
+%(In the context of applications, components that cannot be composed compile to things managed by different threads. at the boundaries, they communicate with ports. Here, there is a meaningful difference between putter and getter. Include example of how a protocol that uses some port A three times still results in a putter-getter pair)
 
 
 %\subsection{Typical Channels}
@@ -55,7 +57,7 @@ In addition to re-using nodes inside a connector, connectors are able to expose 
 Reo took a number of years to take its present shape. It is recognizable as early as 2001, but was presented as a concept before it was formalized, leaving it as a task for future work~\cite{jongmans2012overview}. Later, This several different approaches to formal semantics were developed. For our purposes, it suffices to concentrate only on the small subset of the semantics to follow. For additional information, the work of Jongmans in particular serves as a good entry point\cite{jongmans2012overview}.
 
 
-Starting with the fundamentals, a \textbf{stream} specifies the value of a variable from data domain $D$ changing over the course of a sequence of events. Usually streams are considered infinite, and so it is practical to define them as a function $\mathbb{N}\mapsto{}D$. A \textbf{timed data stream} (TDS) takes this notion a step further, annotating each event in the sequence with an increasing \textit{time stamp}. A TDS is defined by some tuple $(\mathbb{N}\mapsto{}\mathbb{R}, \mathbb{N}\mapsto{}D)$, or equivalently, $\mathbb{N}\mapsto{}(\mathbb{R}, D)$ with the added constraints that time must increase toward infinity\cite{arbab2004modeling}. By associating one TDS with each \textit{named variable} of a program, one can represent a \textit{trace} of its execution. TDS events with the same time stamp are considered simultaneous, allowing reasoning about \textit{snapshots} of the program's state over its run time. These traces can be practically visualized as \textbf{trace tables}, with variables for columns and time stamps for rows by representing the absence of data observations using a special `silent' symbol \textbf{*}, referring \textit{silent behavior}. In this work, we use `trace tables' to refer to both the visualization and to a program trace as a set of named TDS's. The runs of finite programs can be simulated either by bounding the tables (constraining the TDS domain to be finite), or by simulating finite behavior as infinite by extending the `end' forevermore with silent behavior. Table~\ref{tab:fifo1_eg} gives an example of a trace table for some program with two named variables.
+Starting with the fundamentals, a \textbf{stream} specifies the value of a variable from data domain $D$ changing over the course of a sequence of events. Usually streams are considered infinite, and so it is practical to define them as a function $\mathbb{N}\mapsto{}D$. A \textbf{timed data stream} (TDS) takes this notion a step further, annotating each event in the sequence with an increasing \textit{time stamp}. A TDS is defined by some tuple $(\mathbb{N}\mapsto{}\mathbb{R}, \mathbb{N}\mapsto{}D)$, or equivalently, $\mathbb{N}\mapsto{}(\mathbb{R}, D)$ with the added constraints that time must increase toward infinity~\cite{arbab2004modeling}. By associating one TDS with each \textit{named variable} of a program, one can represent a \textit{trace} of its execution. TDS events with the same time stamp are considered simultaneous, allowing reasoning about \textit{snapshots} of the program's state over its run time. These traces can be practically visualized as \textbf{trace tables}, with variables for columns and time stamps for rows by representing the absence of data observations using a special `silent' symbol \textbf{*}, referring \textit{silent behavior}. In this work, we use `trace tables' to refer to both the visualization and to a program trace as a set of named TDS's. The runs of finite programs can be simulated either by bounding the tables (constraining the TDS domain to be finite), or by simulating finite behavior as infinite by extending the `end' forevermore with silent behavior. Table~\ref{tab:fifo1_eg} gives an example of a trace table for some program with two named variables.
 
 
 \begin{table}[]
@@ -148,7 +150,7 @@ For the purposes of Reo, we are interested in being able to compute the composit
 	\caption[RBA for fifo1 connector.]{RBA of the \textit{fifo1} connector for an arbitrary data domain common to ports $A$ and $B$. Memory cell $m$ is used both to buffer $A$'s value, and as part of the data constraint on both transitions for \textit{emptying} and \textit{filling} the cell to ensure these interactions are always interleaved. Data constraints are formulated for readability such that the `guard' and `assignment' conjuncts are line-separated.}
 	\label{fig:fifo1_rba}
 \end{figure}
-Evidently, memory cells provide a new means of enforcing how data persists over time. In many cases, it can be seen that the same connectors can be represented differently by moving this responsibility between state- and data-domains. \textbf{Rule-based automata} (RBA) are the cases of CA for which this idea is taken to an extreme by relying only on memory cells entirely; RBAs have only one state. Figure~\ref{fig:fifo1_rba} models the \textit{fifo1} connector once again, this time as an RBA. Aside from the added expressivity, RBAs benefit from being cheaper to compose. As the state space is degenerate, RBAs may be easily re-interpreted into forms more easy to work with. \textbf{Rule-based form} (RBF) embraces the statelessness of an RBA as a single formula, the \textit{disjunction} of its constraints. In this view, Dokter et al.\ defines their composition of connectors such that, instead of exploding, the composed connector has transitions and memory cells that are the \textit{sum} of its constituent connectors\cite{dokter2018rule}.
+Evidently, memory cells provide a new means of enforcing how data persists over time. In many cases, it can be seen that the same connectors can be represented differently by moving this responsibility between state- and data-domains. \textbf{Rule-based automata} (RBA) are the cases of CA for which this idea is taken to an extreme by relying only on memory cells entirely; RBAs have only one state. Figure~\ref{fig:fifo1_rba} models the \textit{fifo1} connector once again, this time as an RBA. Aside from the added expressivity, RBAs benefit from being cheaper to compose. As the state space is degenerate, RBAs may be easily re-interpreted into forms more easy to work with. \textbf{Rule-based form} (RBF) embraces the statelessness of an RBA as a single formula, the \textit{disjunction} of its constraints. In this view, Dokter et al.\ defines their composition of connectors such that, instead of exploding, the composed connector has transitions and memory cells that are the \textit{sum} of its constituent connectors~\cite{dokter2018rule}.
 
 
 
@@ -175,42 +177,43 @@ RBAs have a structure more conducive to \textit{simplification} of the transitio
 	\caption[Type state automaton in Java.]{An example of a program which implements a two-state automaton in the Java programming language. Observe that the behavior of states $A$ and $B$ are encoded implicitly in the \textit{structure} of the program, while determining which of the two in $A$ are available $A$ requires a check ar runtime.}
 	\label{listing:putget}
 \end{listing}
-Typically, Reo has used the $Data$ domains in both CA and RBA as parallels to the data-types of the ports. In most of the languages in which Reo protocols are implemented, the discriminants of such types are not distinguished statically. For example, the C language lacks a way to statically enforce a that function \code{void foo(int x)} is only invoked when $x$ is prime. Instead, checks at runtime are used to specialize behavior. On the other hand, the state-space is simple enough to afford a practical translation into the structure of the program itself, requiring no checking at runtime. For example, Listing~\ref{listing:putget} shows an intuitive representation of a connector that alternates between states $A$ and $B$, getting data $x$ from its environment in $A$, and emitting $x$ when $x=3$. Observe that there is no need to protect operations behind a runtime-check of \textit{which} state the corresponding CA is in. This observation has implications for the behavior of implementations of RBAs, as they `cannot remember' which state they are in and must thus perform more checking. In practice, the overhead of this checking is manageable, and does not \textit{explode} under composition as the state space of CAs tend to do. The representation of automata in programming languages is explored in more detail in Section~\ref{sec:type_state}
+Typically, Reo has used the $Data$ domains in both CA and RBA as parallels to the data-types of the ports. In most of the languages in which Reo protocols are implemented, the discriminants of such types are not distinguished statically. For example, the C language lacks a way to statically enforce a that function \code{void foo(int x)} is only invoked when $x$ is prime. Instead, checks at runtime are used to specialize behavior. On the other hand, the state-space is simple enough to afford a practical translation into the structure of the program itself, requiring no checking at runtime. For example, Listing~\ref{listing:putget} shows an intuitive representation of a connector that alternates between states $A$ and $B$, getting data $x$ from its environment in $A$, and emitting $x$ when $x=3$. Observe that there is no need to protect operations behind a runtime-check of \textit{which} state the corresponding CA is in. This observation has implications for the behavior of implementations of RBAs, as they `cannot remember' which state they are in and must thus perform more checking. In practice, the overhead of this checking is manageable, and does not \textit{explode} under composition as the state space of CAs tend to do. The representation of automata in programming languages is explored in more detail in Section~\ref{sec:type_state}.
 
 \subsection{The Reo Compiler}
-TODO ask Sung to summarize the history of the Reo compiler. give a summarized story here. 
-
-The compiler aims to take the low-level implementation of a protocol out of the application developer's hands. Given a protocol specification, the compiler generates the \textit{glue code} and 
-
-TODO focus on RBA
+\hl{TODO}
+%TODO ask Sung to summarize the history of the Reo compiler. give a summarized story here. 
+%
+%The compiler aims to take the low-level implementation of a protocol out of the application developer's hands. Given a protocol specification, the compiler generates the \textit{glue code} and 
+%
+%TODO focus on RBA
 
 \begin{listing}[ht]
 	\inputminted[]{text}{fifo1.rba.treo}
-	\caption[Fifo1 connector specfication in textual Reo language.]{TODO.}
+	\caption[Fifo1 connector specfication in textual Reo language.]{Textual Reo specification of the \textit{fifo1} connector using RBA semantics. Data is forwarded from input $A$ to output~$B$, buffered in-between in memory cell~$m$.}
 	\label{listing:fifo1_treo}
 \end{listing}
 
 
-The steps from Reo specification to the generated glue code can be better understood when broken down into stages:
-
-\begin{enumerate}
-	\item \textbf{Specification expansion}\\
-	The composed definitions of Reo components are unrolled to the channel-level until the protocol is represented by one large automaton with many nodes.
-	
-	\item \textbf{Minimization}\\
-	Nodes not in the protocol's interface are \textit{hidden} and the RBA is minimized. This step produces a new, simpler automaton with the same behavior and interface.
-	
-	\item \textbf{TODO PUTTERS AND GETTERS}
-	
-	\item \textbf{Linking and Code Generation}\\
-	The finished source code is generated from the resulting internal-representation. Those associated with functions in the target language are linked accordingly, and the rest are parsed and translated from the operational semantics of Reo to suitable target-language operations (such as data movement and duplication). The rules of the internal state are translated to the runtime definition of a protocol component object. An entrypoint to instantiating this protocol object is generated with the appropriate interface. The specifics of this step vary per target language.
-\end{enumerate}
+%The steps from Reo specification to the generated glue code can be better understood when broken down into stages:
+%
+%\begin{enumerate}
+%	\item \textbf{Specification expansion}\\
+%	The composed definitions of Reo components are unrolled to the channel-level until the protocol is represented by one large automaton with many nodes.
+%	
+%	\item \textbf{Minimization}\\
+%	Nodes not in the protocol's interface are \textit{hidden} and the RBA is minimized. This step produces a new, simpler automaton with the same behavior and interface.
+%	
+%	\item \textbf{TODO PUTTERS AND GETTERS}
+%	
+%	\item \textbf{Linking and Code Generation}\\
+%	The finished source code is generated from the resulting internal-representation. Those associated with functions in the target language are linked accordingly, and the rest are parsed and translated from the operational semantics of Reo to suitable target-language operations (such as data movement and duplication). The rules of the internal state are translated to the runtime definition of a protocol component object. An entrypoint to instantiating this protocol object is generated with the appropriate interface. The specifics of this step vary per target language.
+%\end{enumerate}
 
 \section{Target Languages}
 In this section we introduce terminology relevant to the languages targeted for code generation by the Reo compiler. We identify patterns and properties that are relied upon in later chapters.
 
 \subsection{Affine Type System}
-The notion of `affinity' as we use it has its roots in logic. In a type-theoretic proof system, one can attempt to derive some \textit{judgment} $\Gamma\vdash{}t:\tau$ with \textit{statements} assigning \textit{types} to \textit{terms} (here term $t$ is assigned type $\tau$) under context $\Gamma$. A context is simply a list of statements, which can be thought to correspond with \textit{assumptions} or \textit{premises}. The judgment holds if one can construct a proof, starting with the judgment and select and applying rules until no `dangling' judgments remain. For example, simply-typed lambda calculus has a type-derivation rule for abstraction, substitution and application~\cite{nederpelt2014type}. Depending on the type system, \textit{structural rules} may additionally be provided for manipulating (`massaging') the context such that other rules may be applied. For example, \textit{weakening} is a common structural rule that allows one to arbitrarily discard statements from the context. Depending on the proof system, this may be useful or even necessary before other rules can be applied such that the proof can be completed. For example, $weakening$ is required to prove $A, t:\tau\vdash t:\tau$, as $var$ cannot be directly applied; $A$ is in the way. One can imagine that the ability to arbitrary replicate, discard and re-arrange terms effectively describes a type system that treats its context like a set.
+In a nutshell, affine types are characterized by modeling values as finite resources, operations on which \textit{consume} them. This notion of `affinity' has its roots in logic. In a type-theoretic proof system, one can attempt to derive some \textit{judgment} $\Gamma\vdash{}t:\tau$ with \textit{statements} assigning \textit{types} to \textit{terms}; here term~$t$ is stated to have type~$\tau$ under context~$\Gamma$. A context is simply a list of statements, which can be thought to correspond with \textit{assumptions} or \textit{premises}~\cite{nederpelt2014type}. The judgment holds if one can construct a proof, starting with the judgment and select and applying \textit{rules} until no `dangling' judgments remain; the set of available rules characterizes the system. For example, simply-typed lambda calculus has a type-derivation rule for abstraction, substitution and application. Depending on the type system, \textit{structural rules} may additionally be provided for manipulating (`massaging') the context such that other rules may be applied. For example, \textit{weakening} is a common structural rule that allows one to arbitrarily discard statements from the context. Depending on the proof system, this may be useful or even necessary before other rules can be applied such that the proof can be completed. For example, $weakening$ is required to prove $A, t:\tau\vdash t:\tau$, as $var$ cannot be directly applied; $A$ is in the way. One can imagine that the ability to arbitrary replicate, discard and re-arrange terms effectively describes a type system that treats its context like a set.
 \[
 \begin{aligned}
 (var): \frac{}{t:\tau \vdash t: \tau}
@@ -221,7 +224,7 @@ The notion of `affinity' as we use it has its roots in logic. In a type-theoreti
 \end{aligned}
 \]
 
-\textit{Affine} type systems are characterized by the absence of the \textit{contraction} rule. Proofs cannot replicate statements at will, and thus they are a finite resource in the proof, \textit{consumed} by the application of rules~\cite{walker2005substructural}.
+\textit{Affine} type systems are characterized by the absence of the \textit{contraction} rule. Proofs cannot replicate statements at will, and thus they are a finite resource in the proof, \textit{consumed} by use in rules~\cite{walker2005substructural}.
 
 As type systems do in general, type affinity excludes some programs from being expressed. In the context of programming languages, why would we want this? Of course, the hardware has no problem replicating the bytes representing some integer. Why then do we limit ourselves? This argument can be made for type systems in general; the machine likewise has no problem re-interpreting the bytes storing a string as an integer. This limitation is a feature in and of itself as long as the programs lost are usually somehow `undesirable'. For example, it is exceedingly common practice to dedicate a memory region to one type for the duration of the program. The reasons for this are primarily for the programmer and not the program; it is simply easier to distinguish values by type such that values only move between them when explicitly `moving' in memory.
 
@@ -332,4 +335,3 @@ the \textit{signature} of the callback function and (b) prohibiting the user fro
 	\caption[Proof of work pattern example of `promises'.]{A demonstration of proof-of-work pattern. Here, the user is able to execute \code{main} with any function as argument, but it must certainly invoke \code{fulfill} exactly once.}
 	\label{listing:promise}
 \end{listing}
-

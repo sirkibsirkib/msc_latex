@@ -79,13 +79,15 @@ Until anonymous sum types are supported, our solution to the problem of represen
 % representing an indeterminate state-type which will \textit{later} be chosen from the elements of the set. This type is entirely opaque other than a function to code{determine} it. At runtime, \textit{determine} blocks until the governor receives a message from the protocol, communicating a particular choice. For cases where the \code{StateSet} is a singleton, \code{determine} simply unwraps the element. While the decision is made at \textit{runtime}, the type-state automaton exists at runtime. To make this possible, the programmer must provide behavior for each \textit{case}, corresponding to elements of the set, one of which will be chosen by \code{determine}. This use case describes a \textit{sum type}, which is already present in rust as the \code{enum}, a union type with a set of \textit{variants}. However, every new variant set would necessitate the definition of a new enum. This is impractical, as the number of combinations are large. Instead, we implement our own types which behave and appear to the user much like \textit{anonymous sum types} (which do not currently exist in the rust language). This is achieved by relying once again on Rust's trait system to encode \textit{lists} in type-space, using nested tuples. \textit{Matching} of these nested tuple types translates to peeling away tuple layers.
 
 \subsection{Governed Environment}
-TODO
+\hl{TODO}
 
 \section{Making it Practical}
+\hl{TODO}
 
 \subsection{Approximating the RBA}
+\hl{TODO}
 \subsubsection{Motivation}
-TODO
+\hl{TODO}
 
 \subsubsection{Data Domain Collapse}
 % making RBA automata feasible
@@ -258,25 +260,93 @@ To demonstrate the normalization procedure, Table~\ref{tab:fifo2_rbf_tsa_norm} s
 
 
 \subsection{Unknown Memory State}
+\hl{TODO}
+TODO I've got some material that goes here but I need to re-distribute some of its contents to earlier sub-sections first.
+
+%The design of the governor based on type-state automata discussed thus-far are able to accurately represent the configuration space of \textit{approximated} RBAs, as explained in Section~\ref{sec:approximating_rba}. The design so far also \textit{obliges} the end-user to walk through the projected, normalized automaton in a predefined manner. This is a consequence of the governor removing the compute components' ability to \textit{make decisions} that impact the protocol such that the system reaches consensus, as described in Section~\ref{sec:rule_consensus}. Consider a compute component which interfaces using ports $\{A,B\}$ with a protocol defined by RBF in Table~\ref{tab:counting_rbf}. Generating a governor for this RBA results in a new projected and normalized RBA, shown compared to the original RBA in Figure~\ref{fig:counter_RBAs}. As always, normalization does not change the sequence of ports on which the component must operate, in this case being an infinitely-repeating chain of $[A,A,A,A,B]$. The state space cannot be reduced without losing information; States `000' and `001' have in common that the next several port operations are $A$, but they are still distinguishable. The user must treat these states differently as they are not interchangeable, and thus, do not correspond to interchangeable types. Imagine the user's experience in the case of the similar \textit{512-count cycle} protocol, where their component must distinguish between 512 states!
+%
+%
+%
+%\begin{table}
+%	\centering
+%	\begin{tabular}{l|ll}
+%		rule & guard & assignment \\
+%		\hline
+%		0 & $m_0=*$
+%		& $\gapwedge{}m_0'=d_A$\\
+%		1 & $m_0\neq{}*\wedge{}m_1=*$
+%		& $\gapwedge{}m_1'=m_0\wedge{}m_0'=*$\\
+%		2 & $m_0=m_1\neq{}*\wedge{}m_2=*$
+%		& $\gapwedge{}m_2'=m_0\wedge{}m_0'=m_1'=*$\\
+%		3 & $m_0=m_1=m_2\neq{}*$
+%		& $\gapwedge{}d_B=m_0\wedge{}m_0'=m_1'=m_2'=*$\\
+%		\hline
+%	\end{tabular}
+%	\caption{RBF of the \textit{8-count cycle} connector which uses the full/empty states of its memory cells $m_{0-2}$ as bits for counting in base~2. Rule~3 rolls over to zero and puts a value to port $B$. Every second rule fired is~0, getting a value from port~$A$.}
+%	\label{tab:counting_rbf}
+%\end{table}
+%
+%
+%
+%
+%\begin{figure}[ht]
+%	\centering
+%	\footnotesize
+%	\begin{tikzpicture}
+%	[ inner sep=0.5mm ]
+%	\matrix (m) [ matrix of nodes, row sep=0.5cm, column sep = 0.5cm, 
+%	nodes = {anchor=center,circle, draw=black, thick, fill=gray!10},] {
+%		\node(m0)[initial]{000}; & \node(m1){001}; & \node(m2){010}; & \node(m3){011}; & \node(m4){100}; & \node(m5){101}; & \node(m6){110}; & \node(m7){111};\\
+%		\node(n0)[initial]{000}; & \node(n1){001}; & & \node(n3){011}; & & \node(n5){101}; & & \node(n7){111};\\
+%	};
+%	\draw
+%	(m0) edge[below] node{$A$} (m1)
+%	(m1) edge[below] node{$\cdot$} (m2)
+%	(m2) edge[below] node{$A$} (m3)
+%	(m3) edge[below] node{$\cdot$} (m4)
+%	(m4) edge[below] node{$A$} (m5)
+%	(m5) edge[below] node{$\cdot$} (m6)
+%	(m6) edge[below] node{$A$} (m7)
+%	(m7) edge[bend right, below] node{$B$} (m0)
+%	
+%	(n0) edge[above] node{$A$} (n1)
+%	(n1) edge[above] node[pos=0.84]{$A$} (n3)
+%	(n3) edge[above] node[pos=0.84]{$A$} (n5)
+%	(n5) edge[above] node[pos=0.84]{$A$} (n7)
+%	(n7) edge[bend left, above] node{$B$} (n0)
+%	;
+%	\end{tikzpicture}
+%	\caption{Rules transitioning through configuration space of approximated RBAs for \textit{8-count cycle} connector, with states named after the `count' the three memory cells represent in base~2 for (above) the protocol, and (below) the projected, normalized RBA of the governor for a component with interface $\{A,B\}$.}
+%	\label{fig:counter_RBAs}
+%\end{figure}
+%
+%The chosen type-state encoding affords a very practical means of \textit{customization} to the implementor of compute components which allows them to further simplify their view of the protocol's automaton. We introduce a third type for a new state memory cells can be in: \code{Unknown}. A type-state with memory cells in an \textit{unknown} state is obliged to cover the \textit{union} of all its concrete possibilities. For example, \code{(Empty, Unknown)} may result in any states either \code{(Empty, Empty)} or \code{(Empty, Full)} may result in. With this definition, it is perfectly correct for a state-type to be `weakened', converting it into a new state-type, identical but with any of its tuple-elemets replaced by \code{Unknown}. In a sense, this approach has type-states no longer corresponding with configurations 1-to-1, but rather, each type-state encodes a simple predicate such that it represents a \textit{set} of configurations. For example, \code{(Unknown, Unknown)} represents \textit{any} configuration (of an RBA with two memory cells). Conceptually, this change has no influence on the way a governor computes which rules are applicable next, but the programmer is empowered with the ability to trade \textit{specificity} for \textit{brevity} in their compute-component implementations. Figure~\ref{fig:weakening} shows an example of how the programmer may choose to traverse their configuration space for the same connector as in the example above. In this case, using \textit{weakening} does not reduce the number of type-states encountered in the implementation; this is only the result of (a) the original RBA not being very complicated, and (b) the choice to only \textit{partially} weaken some states (It is also possible to weaken everything to \code{(Unknown, Unknown, Unknown)} and then match all rules).
+%
+%
+%\begin{figure}[ht]
+%	\centering
+%	\begin{tikzpicture}[node distance=2cm, inner sep=0.5mm ]
+%	\node[state, initial]      (q000) {\texttt{000}};
+%	\node[state, right of=qee] (q??0) {\texttt{\textcolor{red}{??}0}};
+%	\node[state, right of=q??0] (q??1) {\texttt{\textcolor{red}{??}1}};
+%	\node[state, below of=q??1] (q?11) {\texttt{\textcolor{red}{?}11}};
+%	\node[state, right of=q??1] (q101) {\texttt{101}};
+%	\draw
+%	(q000) edge[dashed] node{} (q??0)
+%	(q??0) edge[above] node{0} (q??1)
+%	(q??1) edge[below, bend left] node{3} (q000)
+%	
+%	(q??1) edge[left, bend right] node{$1\cdot{}0$} (q?11)
+%	(q?11) edge[dashed] node{} (q??1)
+%	
+%	(q??1) edge[below, bend right] node{$2\cdot{}0$} (q101)
+%	(q101) edge[dashed] node{} (q??1)
+%	;
+%	\end{tikzpicture}
+%	\caption{Rules transitioning between configurations of the \textit{8-count cycle} connector in Figure~\ref{fig:counter_RBAs}. Here, the user employs \textit{weakening} to convert (dashed arrows) state tokens to configurations with \textit{unknown} memory cell states. RBA rules firing are shown with solid arrows, annotated with the rule name, corresponding to those given in Table~\ref{tab:counting_rbf}. Note that not all possible weakenings are shown, only an example set that covers all rules.}
+%	\label{fig:weakening}
+%\end{figure}
 
 \subsection{Match Syntax}
-(TODO)
-1. compare enum 
-
-
-
-% # solution: high level
-% # functionality
-% # # encoding CA and RBA into types
-% # # rule consensus
-% # # Governed Environment
-% # # # Governor Entrypoint
-% # # # Port Wrappers
-% # feasibility
-% # # RBA simplification
-% # # RBA preprocessing
-% # # # projection
-% # # # normalization
-% # # opt-in simplification
-% # # match macros
+\hl{TODO}
 

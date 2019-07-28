@@ -100,12 +100,27 @@ Next, we enumerate the requirements which are \textit{qualitative}. By their nat
 	operations} for the protocol object to route payloads and perform bookkeeping. In particular, minimize the cost of \textit{evaluating} the rules before one is selected for firing.
 	
 	
-	\item[$\boldsymbol{R^N_{end}}$] Facilitate the protocol object being destroyed and its resources freed. Minimize the hassle of detecting when a system has terminated.
+	\item[$\boldsymbol{R^N_{end}}$] Facilitate the protocol object being destroyed and its resources freed. Facilitate a means of detecting termination which is correct and ergonomic.
 \end{enumerate}
 
 \subsection{Requirements Evaluated}
-%\hl{TODO}
-TODO
+\hl{TODO}
+
+
+\begin{enumerate}
+	\item[$\boldsymbol{R^F_{correct}}$] Values passing through ports preserve value passing. This is achieved even in the presence of reference-passing optimizations `under the table' by leaning on the same philosophy that Rust uses to prevent data races: prohibit mutable aliasing. Objects are only aliased (accessible via multiple bindings) if they should be identical. Section~\ref{sec:port_operations} explains how we prohibit aliasing into and out of the protocol by relying on value-passing port operations. On the other hand, Reo-rs aliases values, but only \textit{until} they are mutated. Section~\ref{sec:memory_cells} explains how memory values are safely aliased. \hl{TODO refer to the section that treats transform functions}
+	
+	\item[$\boldsymbol{R^F_{init}}$] Section~\ref{sec:user_facing} explains how users are shielded from the granular initialization procedure by exposing an API with explicit constructor functions \code{build} and \code{claim} of protocols and ports respectively. Protocol objects are extensively customizable by the expressiveness of \textit{imperative form}, with which \code{build} is parameterized. At the same time, these structures are kept internally-consistent by the preservation of invariants, and relying on \code{build} as the only user-facing means of instantiation.
+	
+	\item[$\boldsymbol{R^F_{ffi}}$] C and C++ foreign-function interfaces are provided by relying simply declarations with the C ABI where possible. As C cannot support Rust's notion of generics, where necessary, the \code{ffi} module provides generic-free alternatives for data types and functions where generics are represented as data instead. Reo-rs can thus be compiled once into either a statically- or dynamically-linked library for use in these other languages without any additional runtime overhead.
+	
+	\item[$\boldsymbol{R^N_{data}}$] Reo-rs facilitates the transmission of any fixed-size data-types by value. This permits but does require data to be heap-allocated. Sections~\ref{sec:data_exchange} and~\ref{sec:memory_cells} explains how Reo-rs has a value-passing API, but relies on reference-passing to minimize the number of times values are moved in memory.
+	
+	\item[$\boldsymbol{R^N_{fast}}$] Section~\ref{sec:chosen_design} explains Reo-rs coordinates the actions of multiple threads while minimizing the overhead of inter-thread communications. Section~\ref{sec:minimizing_the_bottleneck} explains how meta-operations are represented such that they can be batched, allowing the coordinator to reduce the overhead of processing rules for firing.
+	
+	
+	\item[$\boldsymbol{R^N_{end}}$] Section~\ref{sec:chosen_design} explains how protocol objects are not given their own threads, trivially facilitating termination detection if no ports remain to interact with it. Section~\ref{sec:construction_and_destruction} describes how protocol structures are implicitly cleaned up once all of their ports are destroyed. 
+\end{enumerate}
 
 \section{Protocol Runtime}
 \label{sec:protocol_runtime}
@@ -156,6 +171,9 @@ Options (1) and (3) are already supported by the methods described thus-far. To 
 
 In sections to follow, we ignore this complication and presume the safer value-passing variants are used only.
 
+\subsubsection{Interface with C and C++}
+\hl{TODO}
+
 \subsection{Design Process}
 \label{sec:chosen_design}
 Many designs for the implementation of Reo-like coordinators are possible. Their structure and workings all depend on how information is arranged, and how multiple threads come together to coordinate on an a-priori unknown task without stepping on one another's toes. In our case, we concentrate on the case where all participants in the system share a memory address space, which opens up many means of exchanging data between threads. As is typical in multi-threading, the problem is not accessing the data, but rather restraining oneself from accessing the data at the wrong time. Before we can approach any design decisions, we examine what we know for certain: ports invoke \code{put} or \code{get}, each from their own thread. They cannot return immediately, as this would not result in the correct system behavior; when not aligned in time, getters will often (unknowingly) read uninitialized data, and putters will write their data, never to be read. They wish to exchange data in accordance with some defined protocol, but a priori have no knowledge of the protocol, nor their role in it. The aim is to facilitate rule firing `greedily' as opportunity allows: ie.\ we do not wish to delay the firing of some rule $x$ if some $y$ can be fired sooner.
@@ -164,7 +182,7 @@ Many designs for the implementation of Reo-like coordinators are possible. Their
 The most obvious starting point is asking \textit{who decides which rule to fire?} Reaching consensus prevents the system from reaching some mal-formed state where two rules are being committed to in tandem, violating the protocol or deadlocking on some resource they have in common. It is easy to contrive of such examples where numerous ports are involved. For example, consider a case where two rules disagree on which of two putter ports distribute their datum to a set of getters. If not done carefully, some getters may receive one value, and the rest another. The most approachable solution is to stick more closely to the Reo model by introducing a specialized \textit{coordinator} for each protocol. Consensus is trivial when one participant is elected the leader for every circumstance. Unfortunately, we cannot rely on some port $x$ being involved in every rule firing such that they are the coordinator. Many protocols do not have such an $x$ that can be relied upon to be present. The Java back-end solves this problem by adding a fresh `protocol' thread whose task is to \textit{only} coordinate the others. This approach is easy to think about, as there is a clear mapping from threads to roles. However, the protocol thread is not \textit{inherently} coupled to the actions of ports. It has to \textit{wait} for opportunities to coordinate, necessitating the transmission of explicit events from compute-threads to the coordinator. These messages can use a channel, or use something like semaphores or monitors to send \textit{signals} instead, and then relying on the coordinator to \textit{re-discover} which ports are ready by reading the state of shared memory. Next, one must decide \textit{who} organizes the actions into an interaction. The Java backend's approach is to spread ports out over space such that they can become ready concurrently\footnote{Conceptually this could be in parallel, but the actual implementation the exchange necessitates the use of a \textit{class monitor lock} to prevent interfering with the protocol thread itself.}. The coordinator then treats the port structures like messaging pigeonholes, and performs the task of moving data around itself. The coordinator's notification to the ports is subtle; taking the form of \code{put} and \code{get} calls which release port-local locks, unblocking the compute-threads, completing the interaction. This solution is effective, but has some downsides, as discussed in Section~\ref{sec:java_observations}. 
 
 \subsubsection{Event Handling}
-A minor change with the potential for improvement is to remove the necessity of the protocol thread to \textit{re-discover} the nature of the event which generated a wakeup signal. Rather than signals with no payload, we can use \textit{events} which carry explicit information, eg: `Port $x$ is ready to get!'. With this approach, the coordinator waits in an \textit{event loop}, handling incoming events. The Rust ecosystem has a number of libraries for defining event loops built atop system signal handles. An early implementation made use of the \code{mio} crate\footnote{\url{https://crates.io/crates/mio}} for sending events which communicated \textit{which} port has become ready. With this minor change, the coordinator does not need to inspect the contents of ports directly, which, owing to their modification by multiple threads, inherently cause several \textit{cache misses} for the coordinator. Rather, the coordinator is able to manage a private, dense, \textit{redundant} record of which ports are ready. Aside from the unfortunate data duplication, this optimization contributes greatly to the satisfaction of $\boldsymbol{R^N_{fast}}$. Unfortunately, regardless of how fast \code{mio} may be, the event must still cross the boundary between threads. In over-encumbered systems, this has the consequence of causing context switches.
+A minor change with the potential for improvement is to remove the necessity of the protocol thread to \textit{re-discover} the nature of the event which generated a wakeup signal. Rather than signals with no payload, we can use \textit{events} which carry explicit information, eg: `Port $x$ is ready to get!'. With this approach, the coordinator waits in an \textit{event loop}, handling incoming events. The Rust ecosystem has a number of libraries for defining event loops built atop system signal handles. An early implementation made use of the \code{mio} crate for sending events which communicated \textit{which} port has become ready. With this minor change, the coordinator does not need to inspect the contents of ports directly, which, owing to their modification by multiple threads, inherently cause several \textit{cache misses} for the coordinator. Rather, the coordinator is able to manage a private, dense, \textit{redundant} record of which ports are ready. Aside from the unfortunate data duplication, this optimization contributes greatly to the satisfaction of $\boldsymbol{R^N_{fast}}$. Unfortunately, regardless of how fast \code{mio} may be, the event must still cross the boundary between threads. In over-encumbered systems, this has the consequence of causing context switches.
 
 \subsubsection{Threadless Protocol}
 We observe that the use of a protocol thread results in a strange property for rules involving one or more ports: Always at least one thread is not doing any meaningful work. To understand why, consider an example protocol which simply forwards data from producer~$P$ to consumer~$C$. Figure~\ref{fig:sequence_diag} shows a possible sequence of events. The coordinator cannot act until a rule can be fired. As soon as the rule is ready, all the involved ports are blocked. Until the coordinator has finished completing the interaction, the other threads wait, blocked until the coordinator releases them. Even the most efficient event-handling system cannot help but to make matters worse by adding delays in both directions.
@@ -172,7 +190,7 @@ We observe that the use of a protocol thread results in a strange property for r
 \begin{figure}[t]
 	\centering
 	\includegraphics[width=8cm]{sequence.png}
-	\caption[TODO]{TODO}
+	\caption[TODO]{TODO. Figure is placeholder too.}
 	\label{fig:sequence_diag}
 \end{figure}
 
@@ -218,6 +236,8 @@ This section explains how the data structures of the \code{Proto} type comes to 
 
 \subsubsection{Rule Interpreter}
 Unlike the Java implementation, Reo-rs moves the specification of the protocol type very late into the pipeline from Reo to the final application. Rather than relying on Reo to generate \textit{native} application code, in this work we make more extensive use of the \textit{virtualization} pattern. At runtime, the coordinator traverses rules in data form, performing tasks as a rudimentary \textit{interpreter}. The tasks associated with such a \code{Rule} correspond closely to the conceptual interpretation of the imperative form; as such, they are treated like \textit{transactions} at runtime. 
+
+\hl{TODO more detail and talk about temporary variables}
 
 
 \subsubsection{Minimizing the Bottleneck}
@@ -282,8 +302,7 @@ This process is complete enough to implement the desired functionality for \mbox
 	For copy-types, the mover and the \textit{copiers} may copy the original datum in parallel. Afterward, only a last-getter is elected to clean up, safe in the knowledge that all copies are finished.
 \end{enumerate}
 
-Listing~\ref{sec:data_exchange} in the Appendix provides the resulting data-exchange procedure in full detail.
-TODO REWORD I AM TIRED.
+The full data-exchange procedure is spelled out in Rust-like pseudocode in Listing~\ref{sec:data_exchange} in the Appendix.
 
 % (1) getters invoked by \code{get\_signal}  //
 %

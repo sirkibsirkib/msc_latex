@@ -152,10 +152,13 @@ y1 = c(266, 320, 401, 419, 478, 519, 554, 610, 651, 662, 743, 757,
        1704, 1750, 1765, 1840, 1858, 1899, 1959);
 
 # check false
-y2 = c(240, 354, 439, 528, 723, 725, 817, 901, 1013, 1181, 1541, 1649, 1327,
-       1872, 1593, 1675, 2801, 2748, 2858, 3291, 3143, 2238, 2236, 2457, 2883,
-       2584, 2741, 2804, 2968, 2914, 3281, 3171, 3189, 3310, 3384, 5012,
-       3679, 3861, 3666, 3938);
+y2 = c(244, 373, 611, 675, 751, 895, 1008, 1134, 1257, 1391, 1511, 1635, 1780, 1895, 2011, 2153, 2278, 2405, 2533, 2661, 2786, 2911, 3039, 3170, 3287, 3420, 3540, 3682, 3819, 3929, 4065, 4194, 4310, 4426, 4554, 4695, 4828, 4940, 5078, 5352);
+
+# swap then check false
+y2b = c(247, 477, 698, 996, 1160, 1369, 1680, 1840, 2082, 2313, 2505, 2760,
+        2970, 3224, 3515, 3606, 3801, 4131, 4354, 4592, 4872, 5048, 5267,
+        5505, 5732, 5929, 6178, 6419, 6645, 6895, 7477, 7353, 7554, 7799,
+        7986, 8209, 8545, 8822, 8922, 9183);
 
 # 5x5 nested ands
 y3 = c(245, 805, 1959, 2055, 2802, 4219, 4758, 6340, 7473, 11064,
@@ -170,20 +173,20 @@ y4 = c(271, 1845, 3533, 4751, 6293, 8941, 11445, 11088, 12416, 13894,
        42334, 47088, 45782, 45958, 45899, 48499, 50892, 54469, 76016,
        66190, 60281, 61970);
 
-leggy = c("guard", "false", "ands", "alloc");
+leggy = c("guard", "false",  "swap", "ands", "alloc");
 mypng("check_time_0.png")
  op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat <- matrix(c(y1-239, y2-239, y3-239, y4-239), ncol=4);
-matplot(x, dat/thou, type="l", lty=1:4, col=1:4, ylab="overhead (μs)", xlab="unsatisfied rules") #plot
-legend("topleft", legend=leggy , col=1:4,  ncol=1,
+dat <- matrix(c(y1-239, y2-239, y2b-239, y3-239, y4-239), ncol=5);
+matplot(x, dat/thou, type="l", lty=1:5, col=1:5, ylab="overhead (μs)", xlab="unsatisfied rules") #plot
+legend("topleft", legend=leggy , col=1:5,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:5)
 dev.off()
 
 mypng("check_time_1.png")
  op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-matplot(x, dat/thou, type="l", lty=1:4, col=1:4, log='y', ylim=c(0.07, 80), ylab="overhead (ns)", xlab="unsatisfied rules") #plot
+matplot(x, dat/thou, type="l", lty=1:5, col=1:5, log='y', ylim=c(0.07, 80), ylab="overhead (ns)", xlab="unsatisfied rules") #plot
 legend("bottomright", legend=leggy , col=1:4,  ncol=2,
-       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:4)
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:5)
 dev.off()
 
 

@@ -4,16 +4,7 @@
 In this section we evaluate the performance of the Reo-rs library, focusing primarily on the optimizations described in Section~\ref{sec:protocol_runtime}.
 
 \section{Experimental Setup}
-
-this kind of machine blah blah.
-
-we have a number of tests with these conditions:
-
-\begin{enumerate}
-	\item \textbf{Reo overhead}\\
-	TODO
-	
-\end{enumerate}
+\hl{TODO}
 
 
 
@@ -57,6 +48,7 @@ we have a number of tests with these conditions:
 %\end{landscape}
 
 \section{Reo-rs in Context}
+This section compares the performance of Reo-rs to its various competitors: (1) existing Reo back-end for the Java language (2) Hand-crafted Rust protocol code. The goal is to provide the reader with an understanding on the strengths and weaknesses of Reo-rs in a broader context.
 
 \subsection{Versus the Java Implementation}
 We begin by making the most intuitive benchmark to get an understanding of how effectively Reo-rs has been optimized for its task; we compare it to the work of the Reo compiler's Java code-generator. This comparison spans two vastly different systems with different goals, but also compare a memory-managed language to a system's language. The reader should bear this in mind when interpreting the measurements. As our test scenario, we have a set of $N$ getters repeatedly copying some memory value $M$, retained inside the protocol from initialization. By involving a contended resource, we are able to test and compare the \textit{scalability} the generated programs, both in terms of number of ports and the size of the transmitted data.
@@ -86,7 +78,7 @@ Figure~\ref{fig:rust_v_java_2} attempts to draw the same comparison as before, b
 \begin{figure}
 	\centering
 	\includegraphics[width=0.80\textwidth]{experiments/rust_v_java_2.png}
-	\caption[Java vs.\ Rust interaction time for large values.]{Comparison of interaction time for the \textit{fetch} connector for both Java and Rust backends moving 64-kilobyte-sized data. The Rust backend moves the datum by value, while the Java parallel `java\_reference' aliases the object (moving by reference). This backend does not support semantics-preserving value-passing. We achieve safety here by the coordinator injecting \code{clone} operations of byte arrays to mirror Rust's bit-wise value-copy, called `java\_value'. Note the logarithmic y-axis.}
+	\caption[Java vs.\ Rust interaction time for large values.]{Comparison of interaction time for the \textit{fetch} connector for both Java and Rust backends moving 64-kilobyte-sized data. The Rust backend moves the datum by value, while the Java parallel `java\_reference' aliases the object (moving by reference). This backend does not support semantics-preserving value-passing. We achieve safety here by the coordinator injecting \code{clone} operations of byte arrays to mirror Rust's bit-wise copy, called `java\_value'. Note the logarithmic y-axis.}
 	\label{fig:rust_v_java_2}
 \end{figure}
 
@@ -134,6 +126,7 @@ Reo-rs is designed to handle the expressivity that characterizes the Reo languag
 \end{figure}
 
 \section{Overhead Examined}
+Here, we examine the performance characteristics of Reo-rs in more detail under various circumstances. The goal is to understand how Reo-rs uses its computational resources, and how performance responds to properties of the specific protocol.
 
 \subsection{Port-Operation Parallelism}
 
@@ -271,8 +264,3 @@ Figure~\ref{fig:clone_compete_2} omits the exceptional single-getter case to sho
 	\label{fig:clone_compete_2}
 \end{figure}
 
-TODO getter's point of view in multi-getter siso. check if there is a correlation between \#getters and the MEAN getter RTT
-
-TODO coordinator contention. have N getters that each clone a datum, each firing their own rules. measure mean RTT
-
-TODO update data exchange procedure pseudocode
