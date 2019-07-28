@@ -23,6 +23,8 @@
 
 
 \usepackage{tocloft}
+\setlength{\cftbeforechapskip}{5pt}
+%\renewcommand\cftchappresnum{\vskip0pt}
 %\setlength{\cftsecindent}{0em}
 %\setlength{\cftsubsecindent}{0em}
 %\setlength{\cftsubsubsecindent}{0em}
@@ -132,6 +134,7 @@
 \date{\today}
 
 \begin{document}
+\pagenumbering{roman}
 
 \begin{titlepage}
 	\centering
@@ -146,7 +149,7 @@
 	\vspace{0.2cm}
 	\small \textit{Submitted in partial fulfillment of the requirements for\\ the degree of Master of Science in\\ Parallel and Distributed Computer Systems.}\par}
 	\vspace{1.5cm}
-	{\Huge\bfseries \rm \textbf{Generating Safe and Fast\\ Coordination code in\\ Rust with Reo}\par}
+	{\Huge\bfseries \rm \textbf{\hl{NAME TBD}}\par}
 	\vspace{1.5cm}
 	{\Large\itshape\rm \noindent\textit{Christopher Esterhuyse}\\}
 	\vspace{1mm}
@@ -181,6 +184,9 @@ dr.\ J.\ \textsc{Endrullis} & prof.\ dr.\ F.\ \textsc{Arbab}
 TODO
 }
 
+\chapter*{Acknowledgments}
+\hl{TODO}
+
 \include{parts/preface}
 
 \tableofcontents
@@ -192,15 +198,17 @@ TODO
 
 % worry about the page numbers later. I think it's got something to do with HL
 
-\part{Preliminaries}
+
+\pagenumbering{arabic}
+%\part{Preliminaries}
 \include{parts/preliminaries/introduction}
 \include{parts/preliminaries/background}
-\part{Contributions}
+%\part{Contributions}
 \include{parts/contributions/protocol_translation}
 \include{parts/contributions/protocol_runtime}
 \include{parts/contributions/static_governors}
 \include{parts/contributions/benchmarks}
-\part{Reflection}
+%\part{Reflection}
 \include{parts/reflection/discussion}
 
 \bibliographystyle{alpha}
