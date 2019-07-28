@@ -260,6 +260,7 @@ To demonstrate the normalization procedure, Table~\ref{tab:fifo2_rbf_tsa_norm} s
 
 
 \subsection{User-Defined Protocol Simplification}
+\label{user_defined_simplification}
 Recall, the purpose of a governor is to preserve a system's \textit{liveness}.
 They do this by ensuring that their governed compute component performs port operations that allow the interfacing protocol (and the system around it) to progress. 
 Governors do this by enforcing that their compute component's implementation \textit{covers} each possible transition with code that performs the required task, and ensuring it is chosen correctly in accordance with the wishes of the protocol. Section~\ref{sec:rule_consensus} explains how our type-state automaton represents this by each configuration requiring the definition of a \textit{set} of transitions, one for each action. We say the implementation `covers' each of these cases by defining the component's behavior in each cases, including the invocation of the relevant port operation.
@@ -385,5 +386,4 @@ Our solution to this problem is to introduce a third type, representing the stat
 %\end{figure}
 
 \subsection{Match Syntax}
-\hl{TODO}
-
+Section~\ref{sec:rule_consensus} explains how the set of transitions to be covered by a configuration type can be represented in Rust's type system as a tail-recursive list. This alleviates the problem of having to explicitly enumerate the needed sets each as their own enumeration type. Unfortunately, these are not natively-supported enumeration types, and thus cannot be \textit{matched} as is idiomatic in the Rust language.  
