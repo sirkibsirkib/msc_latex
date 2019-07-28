@@ -100,7 +100,7 @@ As before, we are able to represent an RBA rule as a \textit{function} in the Ru
 
 \begin{listing}[ht]
 	\inputminted[]{rust}{fifo_tsa.rs}
-	\caption[Type state automaton in Rust for the fifo2 connector.]{Type-state automaton for the \textit{fifo2} protocol in Rust. The three latter functions correspond to the three rules seen for the RBA in Listing~\ref{fig:fifo2_rba}. Function bodies are omitted for brevity.}
+	\caption[Type state automaton in Rust for the fifo2 connector.]{Type-state automaton for the \textit{fifo2} protocol in Rust. The three latter functions correspond to the three rules seen for the RBA in Listing~\ref{fig:fifo2_rba}. Function bodies are omitted for brevity. Note that \code{M} is not a type, but rather a generic \textit{type parameter} to be instantiated at the call site.}
 	\label{listing:fifo_tsa}
 \end{listing}
 
