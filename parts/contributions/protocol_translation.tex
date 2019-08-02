@@ -47,18 +47,18 @@ In this section, we define our new intermediate representation of Reo protocol s
 \subsection{Intuition}
 Imperative form makes explicit the \textit{ordering} of events for which the ordering cannot be arbitrary. In other words, synchronous concurrency can still be expressed, but operations whose correctness relies upon their ordering are expressed explicitly. For very simple protocols, imperative form is very similar to their original relational representation, notably excepting the distinction between \textit{guard} and \textit{assignment}. This separation is not unique to imperative form, and is already provided by the Reo compiler's internal representation as input to the code generator. Within the guard, only unordered structures are used; for example, the \textit{synchronization constraint} is represented as a \textit{set} of ports.
 
-Imperative form differs from that of the compiler's intermediate representation the more extensively the protocol makes use of sycnhronous manipulations of its state, ie.\ the more the protocol's state is mutated \textit{within} a single rule. For example, a protocol in RBF with rule $f(P_0)=f(P_1)=f(P_2)$ with input (putter) ports $P_{0-2}$ is represented very differently indeed; in this example, the results of $f$ clearly cannot be compared until \textit{after} they are computed.
+Imperative form differs from that of the compiler's intermediate representation the more extensively the protocol makes use of synchronous manipulations of its state, ie.\ the more the protocol's state is mutated \textit{within} a single rule. For example, a protocol in RBF with rule $f(P_0)=f(P_1)=f(P_2)$ with input (putter) ports $P_{0-2}$ is represented very differently indeed; in this example, the results of $f$ clearly cannot be compared until \textit{after} they are computed.
 
 As an approachable metaphor, imperative form represents a synchronous rule firing as a \textit{transaction} by structuring its actions and partitioning the sequence around some instant where the rule can be said to \textit{commit}. Actions then fall into one of two categories:
 \begin{itemize}
 	\item \textbf{Transient Actions}\\
-	Actions \textit{before} committing cannot involve any irrevecable 
+	Actions \textit{before} committing may only perform mutations of the protocol state that can be \textit{rolled back} reversing their effects. Implicitly, this prohibits any actions that are visible to an outside observer. Actions are also allowed to trigger a rollback and abort.
 	
 	\item \textbf{Persistent Actions}\\
+	Action \textit{after} committing may irrevocably mutate the state and produce observable effects, but may not trigger a rollback.
 \end{itemize}
 
-
-what it does NOT include: generic types (for FFI) and memory initialization (as it can't reliably represent it anyway)
+For our example RBF, the check for equality acts as a \textit{guard}, but its computation involves consuming the values put by $P_{0-2}$. In imperative form, $f$ is required to be a pure function which does not \textit{consume} the values of $P_{0-2}$ (eg.\ by reading them via immutable reference), and is invoked to produce three temporary variables. These can be checked for equality. If the check fails, all actions \textit{roll back}, discarding our temporary variables and aborting the rule firing. This corresponds to a guard that was not \textit{satisfied}. On the other hand, if the equality passes, the rule \textit{commits} and the values of $P_{0-2}$ are irrevocably consumed (and in this case, discarded). In this way, $P_{0-2}$ only observe their data being consumed if the rule fires.
 
 \subsection{Definition}
 
