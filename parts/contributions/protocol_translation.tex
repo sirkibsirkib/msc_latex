@@ -100,7 +100,7 @@ For our purposes, omitting a source identifier $s$ from~$M$ can be interpreted a
 
 
 \section{Code Generation Pipeline}
-In this section we explore the translation procedure of protocols, starting from their declarative Reo specification in the Reo compiler's internal representation to executable Rust. This is done in two distinct phases, as explained in Section~\ref{sec:decoupling_reo_rust}. Section~\ref{sec:translation_phase_1} performs translation sub-tasks $T_{act}$ and $T_{type}$, and Section~\ref{sec:translation_phase_2} performs the final sub-task: $T_{run}$.
+In this section we explore the translation procedure of protocols, starting from their declarative Reo specification in the Reo compiler's internal representation to executable Rust. This is done in two distinct phases, as explained in Section~\ref{sec:decoupling_reo_rust}. 
 
 \subsection{Phase 1: Reo Compiler Backend}
 \label{sec:translation_phase_1}
@@ -166,8 +166,19 @@ Nevertheless, textual Reo is able to specify the initial states of memory cells.
 
 \subsection{Phase 2: Rust Library}
 \label{sec:translation_phase_2}
+does subtask $T_{run}$
 
 \subsubsection{Soundness Check}
+1. does not trust reo for two reasons (1) decoupling accross API boundary. (2) means protocol can see use withour Reo. use case: protocol dynamic reconfig
+
+\subsubsection{Meta-State Initialization}
+1. lots of bookkeeping structures. needs to initialize locks, semaphores, channels etc.
+
+
+\subsubsection{Interpreter Runtime}
+1. behavior is defined for a general protocol object, with flexibility reduced to a minimal surface area. 
+1. types are erased entirely, relying on type reflection. virtualization / command pattern to the extreme.
 
 \subsubsection{Data Layout Optimization}
-\subsubsection{Meta-State Initialization}
+representation corresponds to layout over time; as usual in imperative form, the value in a cell is a derived concept. prepare for interpretation. bitsets. redundant information
+
