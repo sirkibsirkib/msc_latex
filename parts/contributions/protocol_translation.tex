@@ -60,15 +60,15 @@ For our example RBF, the check for equality acts as a \textit{guard}, but its co
 Conceptualizing an imperative form rule purely as action-sequences gives good intuition for the intention behind the representation. However, this would require concurrent events to be sequentialized. However, many actions are not given in the compiler's internal representation in this form. For example, the ordering of assignments is left unspecified. There is no harm in sequentializing these actions if the end result is indeed sequential. For example, the Java protocol object indeed assigns to memory cells sequentially. Rather than assuming this will always be the case\footnote{Indeed, our final implementation dispatches data movements sequentially, but they are completed concurrently. See Section~\ref{sec:data_exchange}.}, we represents persistent actions as \textit{concurrent} movements from sources to destinations. In the same manner, is it unnecessary to sequentialize the observations in the \textit{guard}; it does not matter the order in which ports are checked for availability. For this reason, imperative form is ultimately represented with three distinct structures (1) unordered transient actions performed before (2) ordered transient actions with rollback, and finally (3) unordered persistent actions.
 
 
-\section{Definition}
+\subsection{Definition}
 \label{sec:imperative_form_definition}
 A protocol description in imperative form must be provided by a single structure which provides mappings for symbolic names such that they can be resolved as they are encountered when traversing the rest of the definition. This \textit{name definition} structure is similar to a \textit{symbol table}. The behavior of the connector itself is defined by a set\footnote{In our implementation, these rules are provided in an ordered list, primarily for the purpose of making for more comprehensible error messages.} of \textit{imperative rules}, each corresponding to an RBA rule, given by a tuple $(P, I, M)$ with:
 \begin{enumerate}
 	\item \textbf{Premise $P$}\\
-	A tuple of three \textit{identifier} sets $(P_R, P_F, P_E)$. Set $P_R$ contains the \textit{synchronization constraint} identical to that of RBAs, referring to the set of ports that `fire'. In the context of a premise, this set describes which ports must be \textit{ready}. $P_F$ and $P_E$ are the sets of \textit{memory variables} which must be known to be full and empty respectively. By definition, any pair of these sets must have an empty intersection. The rule can certainly not consider firing unless all ports are ready and all memory cells are in the specified states. Omitting a port or memory cell represents \textit{undefined state}, and thus is not considered an accessible resource.
+	A tuple of three \textit{identifier} sets $(P_R, P_F, P_E)$. $P_R$~contains the set of identifiers whose values must be `ready', and are thus in stable state, involved in the rule. The subset of identifiers belonging to ports thus encodes the \textit{synchronization constraint} of the associated RBA. $P_F$ and $P_E$ are the sets of \textit{memory variables} which must be known to be full and empty respectively, such that it is known whether they can be read or written from. The rule can certainly not consider firing unless all ports are ready and all memory cells are in the specified states.
 	
 	\item \textbf{Instructions $I$}\\
-	A list of reversible \textit{instructions} which are performed in sequence. These instructions can manipulate resources. As they are tentative, it is also possible to trigger a rollback. Concretely, each instruction is one of:
+	A list of reversible \textit{instructions} which are performed in sequence. These instructions have no immediately observable effects, such that they can be reverted in the event of a \textit{rollback}. Concretely, each instruction is one of:
 	\begin{itemize}
 		\item $check(p)$\\
 		Trigger a rollback if predicate $p$ over data is satisfied.
@@ -86,11 +86,14 @@ A protocol description in imperative form must be provided by a single structure
 
 As an example to demonstrate this representation, the RBA rule in the previous section with data constraint $f(P_0)=f(P_1)$
 and synchronization constraint $\{P_0, P_1\}$ can be represented in the imperative-form rule with:
-\begin{enumerate}
-	\item [$P$] $(\{P_0, P_1\}, \{\}, \{t_0,t_1\})$
-	\item [$I$] $[fill_F(t_0, f, [P_0]), \quad{} fill_F(t_1, f, [P_1]), \quad check(t_0 = t_1)]$
-	\item [$M$] $\{\}$.
-\end{enumerate}
+
+\begin{tabular}{r|l}
+rule element	&  value \\ \hline
+premise	&  $(\{P_0, P_1\}, \{\}, \{t_0,t_1\})$ \\
+instructions	& $[fill_F(t_0, f, [P_0]), \quad{} fill_F(t_1, f, [P_1]), \quad check(t_0 = t_1)]$ \\
+movements	& $\{\}$ 
+\end{tabular}
+\vspace{1em}
 
 For our purposes, omitting a source identifier $s$ from~$M$ can be interpreted as $s\rightarrow{}\{\}$ by default, understood to mean `discard $s$'. For other applications, it may be preferable to require that each source have an explicitly-defined destination set. For example, this would be useful in the context of a \textit{linear type system} in which data cannot trivially be \textit{destroyed}. 
 
@@ -105,7 +108,7 @@ The Rust backend of the Reo compiler translates from the compiler's intermediate
 
 
 \subsubsection{Action Sequencing}
-The most obvious role the backend plays in the translation process is to spread the contents of the relational, interaction-oriented internal representation over the imperative, action-oriented \textit{imperative rules}. The process begins given (1) the set of port putters in the synchronization set, (2) a mapping from port-getter to \code{Term}, (3) a mapping from port-putter to \code{Term}, and (4) a \code{Formula}, representing the rule's guard. Terms and formulas are recursive data structures, and can both be thought of as \textit{sum types}. The former describes a an expression to be computed at runtime. For example, \code{MemoryCell(A)} and~\code{True} are both terms that can be assigned to memory cells and retrieved by getter-ports. \code{Formula} is similar, but used in the context of predicates; formulas are essentially terms known to have a boolean data-type, and thus come with variants for the usual boolean operations. For example, \code{True}, \code{And(Eq(A,B), Eq(B,C))} are examples of formulas. The backend traverses the compiler's internal representation, constructing imperative form rules one at a time, also populating the associated \code{NameDef} symbol table. For each such rule, it helps to consider each of its distinct structures in isolation, initially without any optimizations:
+The most obvious role the backend plays in the translation process is to spread the contents of the relational, interaction-oriented internal representation over the imperative, action-oriented \textit{imperative rules}. This task is called $T_{act}$ in the previous sections. The process begins given (1) the set of port putters in the synchronization set, (2) a mapping from port-getter to \code{Term}, (3) a mapping from port-putter to \code{Term}, and (4) a \code{Formula}, representing the rule's guard. Terms and formulas are recursive data structures, and can both be thought of as \textit{sum types}. The former describes a an expression to be computed at runtime. For example, \code{MemoryCell(A)} and~\code{True} are both terms that can be assigned to memory cells and retrieved by getter-ports. \code{Formula} is similar, but used in the context of predicates; formulas are essentially terms known to have a boolean data-type, and thus come with variants for the usual boolean operations. For example, \code{True}, \code{And(Eq(A,B), Eq(B,C))} are examples of formulas. The backend traverses the compiler's internal representation, constructing imperative form rules one at a time, also populating the associated \code{NameDef} symbol table. For each such rule, it helps to consider each of its distinct structures in isolation, initially without any optimizations:
 
 \begin{enumerate}
 	\item [$P$] \textbf{Premise}\\
@@ -119,12 +122,47 @@ Next, the backend generates a list of \textit{instructions}, representing the \t
 All port-getters and memory cells which are \textit{written to} are grouped by source to produce~$M$, a mapping from sources to destination sets. Each mapping is additionally annotated with a flag to indicate whether the value is retained at the source, ie.\ the mapping is of type $Identifier \Mapsto{} (boolean, \{Identifier\})$. As an example, moving a value from~$A$ to~$B$ results in $A$ mapping to $(\text{\textit{false}}, \{B\})$.
 
 \end{enumerate}
-Clearly, many opportunities exist for optimization of the imperative form, as it affords some degree of \textit{over}-specification and can represent the same specification in different ways. As an example, it is possible to fragment our guard into several \textit{check} instructions. This can be thought of as an explicit encoding of \textit{short-circuiting} behavior. As long as no guard reasons about a temporary variable \textit{prior} to its definition, this is valid. These opportunities were not explored extensively in this work, as instructions in practice tend to be simple enough not to afford many such opportunities. More significant is the \textit{omission} of trivial checks entirely. 
+Clearly, many opportunities exist for optimization of the imperative form, as it affords some degree of \textit{over}-specification and can represent the same connector with a different sequence of instructions. As an example, it is possible to fragment our guard into several \textit{check} instructions. This can be used to achieve \textit{short-circuiting} behavior; as long as no guard reasons about a temporary variable \textit{prior} to its definition, a check may be moved earlier such that rollbacks may be triggered earlier and work can be avoided. These opportunities were not explored extensively in this work, as instructions in practice tend to be simple enough not to afford many such opportunities.
+More significant is the \textit{omission} of trivial checks entirely. This can be done by traversing instructions with a model of the protocol's state, initialized to match the premise. Checks known to always hold can be omitted, and checks known to never hold can result in the rule being discarded entirely (it would never fire!). This optimization is incorporated, and works to great effect in practice.
 
-\subsubsection{Type Classification and Constraint}
-1. does actions and types, but not symbols
-\subsubsection{Code Generation}
-wraps it in a function. handles memory initialization
+
+\subsubsection{Type Classification and Constraining}
+Previously referred to as $T_{type}$, the backend must extract data-type information about its ports and memory cells from the compiler's internal representation such that the generated Rust is valid. Our approach is to begin by assuming that every port, memory cell and temporary variable has its own unrelated type. The types are then \textit{constrained} as a result of discovering the ways in which they are related from the protocol definition. For example, the presence of a term \code{Eq(A,B)} `collapses' the types of~$A$ and~$B$ into one equivalence class. Still, at this level, types are purely symbolic. 
+
+These symbolic types exist only in the first phase of the code generator. They are not only resolved prior to phase two, but they are not present in that phase at all. Our imperative form does not deal with the complexity of symbolic (ie.\ generic or parametric) types. Instead, the Reo compiler relies on the Rust idiom of relying on \textit{dispatch} to resolve concrete types at the last possible moment: at the call site. To achieve this result, Reo generates the \code{ProtoDef} object wrapped in a \textit{wrapper function}, whose role is primarily to expose generic type parameters for instantiation to the caller, and construct a \code{ProtoDef} instance within the body, to be invoked with concrete types. Listing~\ref{listing:type_resolve} gives an example of how this generic function appears to the end user for some trivial protocol. Observe how \code{protocol\_1} relies on generics to let the caller, \code{main\_1} which type to select for~\code{T}. \code{TypeInfo} is a way of representing our symbolic type as data, allowing for the second phase to check for equality and so forth. The details of this type are provided in Section~\ref{sec:type_reflection}.
+
+
+\begin{listing}[ht]
+	\centering
+	\inputminted[]{rust}{type_resolve.rs}
+	\caption[TODO.]{TODO.}
+	\label{listing:type_resolve}
+\end{listing}
+
+Unlike Java, Rust makes very few promises about the properties of some generic type. It cannot be certain that instances of some generic type~\code{T} will have a defined operation for checking equality, or for safe \textit{value replication}. To facilitate \textit{useful} polymorphism, Rust relies on \textit{type constraints} to act as a contract between caller and callee: the caller will ensure that only types which satisfy the bound may be selected for the type parameter, and the callee is able to interact with its generic arguments in accordance with \textit{behavior} the bounds guarantee the type will define. This approach may be familiar to programmers of Java or C, where this concept manifests as interfaces and declarations (usually in header files) respectively. 
+
+The Reo backend cannot guarantee the generated Rust code is sound unless it is careful to add the necessary type bounds to its generic arguments. The internal representation is inspected for cases which will necessitate the use of specialized operations (such as replication) and will annotate its generic types with \textit{trait bounds}. Ultimately, the resulting coalesced, bounded type parameters are reflected in the generated code as part of the function declaration. The second phase of the code generator can rest assured that for every specialized operation inserted, Reo will have already anticipated the need to guarantee the bound is satisfied. Listing~\ref{listing:type_resolve2} gives an example of a generated trait bound for the case where two memory cells are related by being the same, and requiring the definition of an equality operation.
+
+\begin{listing}[ht]
+	\centering
+	\inputminted[]{rust}{type_resolve2.rs}
+	\caption[TODO.]{TODO.}
+	\label{listing:type_resolve2}
+\end{listing}
+
+
+\subsubsection{Initial Protocol State}
+The initial state of a protocol object is unusual in that it is included in the textual Reo protocol definition, but omitted from the \code{ProtoDef}. This design choice reflects how a protocol's initial state is unassuming at first glance, but is significantly different from the rest of the protocols definition: it is the only part of specification that cannot generally be replicated. Rules and name definitions describe \textit{behavior}, and do not involve any elements of the port's data domain directly. By contrast, a protocol's initial state does not \textit{describe} data, it \textit{is} data. By extracting this facet of the specification, \code{ProtoDef} becomes pure in its role as a \textit{blueprint} for a protocol's behavior. 
+
+Nevertheless, textual Reo is able to specify the initial states of memory cells. To support this functionality, the Reo compiler itself generates code which \textit{builds and injects} the initial values for any initially-filled cells in a controlled environment. To mirror the textual descriptions that define the initial values, these memory types acquire a final trait bound such that their initial values can be constructed per protocol object instantiation \textit{within} the confines of the function that the Reo compiler generates. Listing~\ref{listing:mem_init} exemplifies a trivial protocol where~$A$ is a memory cell defined as being initialized by some value represented by the string `\texttt{hello}'. The generated code inserts a trait dependency, ensuring that the type parameter~\code{T} defines this operation. Observe how now the return result is no longer~\code{ProtoDef}, but rather~\code{ProtoHandle}. While the former represents a re-usable \textit{blueprint} for instantiating a~\code{ProtoHandle}, the latter represents an instantiated protocol, initialized and ready to run; the only user-facing means of generating a new object of the same protocol is to again invoke~\code{protocol}.
+
+\begin{listing}[ht]
+	\centering
+	\inputminted[]{rust}{mem_init.rs}
+	\caption[TODO.]{TODO.}
+	\label{listing:mem_init}
+\end{listing}
+
 
 \subsection{Phase 2: Rust Library}
 \label{sec:translation_phase_2}
