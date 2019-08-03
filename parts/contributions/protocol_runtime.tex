@@ -150,8 +150,8 @@ Furthermore, we identify \textit{guidelines} for softer, qualitative properties 
 \end{enumerate}
 
 
-\section{Protocol Runtime}
-\label{sec:protocol_runtime}
+\section{Protocol Objects}
+\label{sec:protocol_objects}
 Here, we explore the Reo-rs library implementation which provides user-facing types that work together to behave as coordination primitives at runtime in accordance to the imperative-form-like \code{ProtoDef} used to configure them.
 
 First, Section~\ref{sec:user_facing} explains the functionality of Reo-rs through the lens of the user-facing API. Beyond this surface level, there is a large design space for implementing the internals. As such, this project necessitated the exploration of several of these possibilities before settling on a design. Section~\ref{sec:chosen_design} begins by summarizing these possibilities and motivating the choice for this work. Section~\ref{sec:protocol_object_architecture} details how this design is laid out as more concrete type definitions in the library (most of which the user will never see). Finally, Section~\ref{sec:behavior_implementation} describes how these structures interact to emerge as coordination.

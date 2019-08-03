@@ -3,7 +3,10 @@
 \section{Future Work}
 \hl{TODO short intro}
 \subsection{Imperative Form Compiler}
-\hl{we use an interpreter. previously, we mention our reasons for doing so. in other circumstances, the overhead of the interpretation may be undesirable. other language targets may be supported by instead again pre-processing imperative form to generate tailor-made target code as the Java back-end does today.}
+Chapters~\ref{sec:imperative_form} and~\ref{sec:protocol_runtime} explain how the Reo-rs runtime makes use of a lightweight interpreter to bring life to our protocol objects at runtime according to the appropriate specification. This \textit{commandification} pattern has its advantages; namely, protocol behavior is alterable at runtime by manipulating the interpreted data. However, this flexibility does not come for free. The interpretation steps incur overhead both to the protocol construction procedure, and more importantly, to the work of \textit{port operations}. Fortunately, our \textit{imperative form} does not necessitate the use of an interpreter. Future work could investigate replacing the \code{build} procedure of Reo-rs with another compilation step such that the behavior is represented in native, directly-executable Rust. 
+
+Futhermore, future work might investigate the use of custom \textit{domain specific languages} for compiling imperative form in a manner that it performs the same checking as in \code{build} \textit{statically}. the obvious means of doing this is to build a compiler from scratch. However, other options exist that can make better use of existing tools. For example, Rust's \textit{procedural macros} allow the programmer to define arbitrary transformations of Rust's \textit{abstract syntax trees} during compilation. Essentially, one is able to invoke arbitrary, pre-compiled Rust code \textit{inside} the user's Rust compiler itself. In this manner, one can embed the needed domain-specific language into the Rust compiler itself.
+
 \subsection{Distributed Components}
 \hl{TODO refer to Reowolf. talk about how protocols can become distributed by partitioning their memory space. problem is complex. involves consensus. refer to reowolf project. refer to farhad's and sung's previous work}
 \subsection{Imperative Branching}
