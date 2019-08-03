@@ -310,7 +310,7 @@ Nevertheless, there is value in providing a compute-component with a simplified 
 	(m7) edge[bend left, above] node{$B$} (m0)
 	;
 	\end{tikzpicture}
-	\caption{Rules transitioning through configuration space of approximated RBAs for \textit{a7b1} connector, with states named after the `count' the three memory cells represent in base~2 (in binary alphabet $\{\text{\code{E}}, \text{\code{F}}\}$). Here, the normalization procedure with interface set~$\{A,B\}$ is trivial as no transitions are silent.}
+	\caption[Configuration space of the a7b1 connector.]{Rules transitioning through configuration space of approximated RBAs for \textit{a7b1} connector, with states named after the `count' the three memory cells represent in base~2 (in binary alphabet $\{\text{\code{E}}, \text{\code{F}}\}$). Here, the normalization procedure with interface set~$\{A,B\}$ is trivial as no transitions are silent.}
 	\label{fig:counter_RBAs}
 \end{figure}
 
@@ -340,7 +340,7 @@ With this tool in their belt, the implementation of the compute component is abl
 	(q???) edge[below left, bend left] node{3} (q000)
 	;
 	\end{tikzpicture}
-	\caption{Rules transitioning between configurations of the \textit{a7b1} connector shown in Figure~\ref{fig:counter_RBAs}. Here, the user employs \textit{weakening} to convert (dashed arrows) state tokens to configurations to the configuration-set `???' containing \textit{all} concrete configurations. RBA rules firing are shown with solid arrows, annotated with the rule name, corresponding to those given in Table~\ref{tab:counting_rbf}.}
+	\caption[Traversed configuration space for a7b1 connector using weakening.]{Rules transitioning between configurations of the \textit{a7b1} connector shown in Figure~\ref{fig:counter_RBAs}. Here, the user employs \textit{weakening} to convert (dashed arrows) state tokens to configurations to the configuration-set `???' containing \textit{all} concrete configurations. RBA rules firing are shown with solid arrows, annotated with the rule name, corresponding to those given in Table~\ref{tab:counting_rbf}.}
 	\label{fig:weakening}
 \end{figure}
 
