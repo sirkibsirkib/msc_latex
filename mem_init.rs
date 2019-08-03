@@ -5,5 +5,5 @@ fn new_protocol<T: From<&str>>() -> ProtoHandle {
     }.build(MemInit::default().with<T>("hello".into())).unwrap()
 }
 fn main() {
-    let _ = new_protocol::<String>();
+    let _ = new_protocol::<String>(); // ok! String: From<&str>
 }

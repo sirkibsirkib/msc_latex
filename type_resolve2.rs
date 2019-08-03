@@ -1,7 +1,7 @@
 fn new_protocol<T: Eq>() -> ProtoDef {
     ProtoDef {
         name_defs: hashmap! {
-			"A" => Memory(TypeInfo::of::<T>),
+            "A" => Memory(TypeInfo::of::<T>),
             "B" => Memory(TypeInfo::of::<T>),
         },
         rules: vec![
