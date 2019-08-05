@@ -194,7 +194,7 @@ As far as Reo is concerned, the entry point to Reo-rs is the \code{build} method
 		purpose & Defines a protocol's behavior. & Is efficiently interpretable at runtime to execute the defined behavior. \\
 		identifiers & Symbolic strings. & Indices, keys and pointers directly into data structures. \\
 		redundancy & Minimizes redundancy for brevity and to minimize error surface. & Replicates data to optimize for access time. \\
-		state & Is stateless, but describes protocol state. & Is stateful, contains conventional protocol state in memory cells, and meta-state for `bookkeeping' thread access, ie.\ stateful mutex locks.
+		state & Is stateless, but describes protocol state. & Is stateful. Contains conventional protocol state in memory cells, and meta-state for `bookkeeping' thread access, ie.\ stateful mutex locks.
 	\end{tabular}
 \end{footnotesize}
 \vspace{1em}
