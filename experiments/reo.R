@@ -294,3 +294,20 @@ legend("topleft", legend=c("reo-rs", "reo-rs (unsafe reference API)","handmade")
        y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=revd)
 dev.off()
 
+
+
+
+############################
+### mem refpass
+# clone type data 8192 (moving through fifoM connector)
+put_get = c(4971, 5063, 5121, 5235, 5290, 5385, 5523, 5700, 5828, 5988, 6604, 6357, 6380, 6561, 6783, 7013, 7180, 7531, 7893, 7929, 8022, 8259)
+rawput_get = c(3305, 3419, 3450, 3506, 3539, 3701, 3759, 3953, 4232, 4309, 4512, 4612, 4690, 5075, 5159, 5436, 5524, 5708, 5928, 6157, 6503, 6737)
+rawput_getsig = c(1558, 1578, 1651, 1751, 1880, 2008, 2215, 2507, 2461, 2523, 2630, 2794, 2941, 3098, 3320, 3661, 3667, 3960, 4237, 4382, 4611, 4848)
+mypngbig("fifo_m.png")
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+dat = matrix(c(put_get, rawput_get, rawput_getsig), ncol=3)
+matplot(x=(1:22), dat/thou, ylim=c(0, max(taken)/thou*1.16), type='b', ylab="duration (μs)", xlab="fifo buffer slots", pch=1:3, lty=1:3)
+leggy = c("both", "only_get", "neither")
+legend("topleft", legend=leggy , col=1:3,  ncol=1,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=1:3)
+dev.off()

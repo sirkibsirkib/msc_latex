@@ -268,3 +268,11 @@ Figure~\ref{fig:clone_compete_2} omits the exceptional single-getter case to sho
 	\label{fig:clone_compete_2}
 \end{figure}
 
+\subsection{Reference-Passing Optimization}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.80\textwidth]{experiments/fifo_m.png}
+	\caption[RTT for fifo-M connector with $2^13$ byte values.]{Round trip time (RTT) through a \textit{fifo-m} connector with~$m$ ranging from 1 to 20, measuring the time taken from the start of the~\code{put} into the head of the queue, to the end of the \code{get} out of the tail. The horizontal red line makes other values easier to compare to the result of $M=1$, relative to which the largest buffer experienced a 1.66 factor for a 20-factor length increase.}
+	\label{fig:fifo_m}
+\end{figure}
