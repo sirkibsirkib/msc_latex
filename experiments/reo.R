@@ -95,7 +95,8 @@ dev.off()
 mypngbig("simo_2.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 ty2 <- ty[,-c(1,2,3)]
-matplot(x, ty2/ty[,3], log='xy', type='b', pch=4:6, ylab="runtime factor relative to |g|=2", lty=4:6, col=4:6, xlab="clone work units")
+matplot(x, ty2/ty[,3], log='xy', type='b', pch=4:6, ylim=c(0.8, 14),
+        ylab="runtime factor relative to |g|=2", lty=4:6, col=4:6, xlab="clone work units")
 legend("left", legend=c("|g|=5", "|g|=4", "|g|=3") , col=rev(4:6),  ncol=1, 
        y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=rev(4:6)
 )

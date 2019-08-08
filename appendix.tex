@@ -6,6 +6,13 @@
 	\label{listing:get_data}
 \end{listing}
 
+\begin{listing}[ht]
+	\centering
+	\inputminted{rust}{alternator_manual.rs}
+	\caption[Hand-crafted alternator implementation.]{Hand-crafted alternator implementation ini Rust based on channels from the \code{crossbeam} crate and a standard-library \code{Barrier} for explicit synchronization. This simple design is chosen for its simplicity and its close correspondence to the Reo channels that constitute its specification.}
+	\label{listing:alternator_manual}
+\end{listing}
+
 
 \begin{listing}[h!]
 	\centering

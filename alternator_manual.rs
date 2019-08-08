@@ -1,14 +1,21 @@
-fn putter_0_work<T>(P0_VALUE: T) {
-	all_barrier.wait();
-	rendezvous_data.send(P0_VALUE);
-}
-fn putter_1_work<T>(P1_VALUE: T) {
-	all_barrier.wait();
-	buffered_data.send(P1_VALUE);
-}
-fn getter_work() -> (T,T) {
-	all_barrier.wait();
-	let P0_VALUE = rendezvous_data.recv();
-	let P1_VALUE = buffered_data.recv();
-	(P0_VALUE, P1_VALUE)
-}
+// initialization
+let barrier_g  = Arc::new(std::sync::Barrier::new(3));
+let barrier_p0 = barrier_g.clone();
+let barrier_p1 = barrier_g.clone();
+let (data_0_s, data_0_r) = crossbeam_channel::bounded(0); // synch  (unbuffered)
+let (data_1_s, data_1_r) = crossbeam_channel::bounded(1); // asynch (1-buffered)
+
+// port operation functions
+let p0_put_function = || {
+	barrier_p0.wait();
+	data_0_s.send(P0_VALUE).unwrap();
+};
+let p1_put_function = || {
+	barrier_p1.wait();
+	data_1_s.send(P1_VALUE).unwrap();
+};
+let g_get_function = || {
+	barrier_g.wait();
+	let value_from_p0 = data_0_r.recv().unwrap();
+	let value_from_p1 = data_1_r.recv().unwrap();
+};

@@ -71,7 +71,7 @@ We begin by making the most intuitive benchmark to get an understanding of how e
 			\label{fig:rust_v_java_1}
 		\end{subfigure}%
 	}
-	\caption[Java vs.\ Rust interaction time for small values.]{Comparison of interaction time for the \textit{fetch} connector for both Java and Rust backends moving small-size values. `rust\_8' and `java\_8' both move a payload of 8~bytes (to match the reference size of the 64-bit JVM). `rust\_8000' gives an example of how the runtime of Reo-rs can change with respect to modest changes in data size. The two sub-figures mirror one another except for the linear and logarithmic y-axes respectively.}
+	\caption[Java vs.\ Rust interaction time for small values.]{Comparison of interaction time for the \textit{fetch} connector for both Java and Rust backends moving small-size values. \texttt{rust\_8} and \texttt{java\_8}  both move a payload of 8~bytes (to match the reference size of the 64-bit JVM). \texttt{rust\_8000}  gives an example of how the runtime of Reo-rs can change with respect to modest changes in data size. The two sub-figures mirror one another except for the linear and logarithmic y-axes respectively.}
 	\label{fig:rust_v_java}
 \end{figure}
 
@@ -82,7 +82,7 @@ Figure~\ref{fig:rust_v_java_2} attempts to draw the same comparison as before, b
 \begin{figure}
 	\centering
 	\includegraphics[width=0.80\textwidth]{experiments/rust_v_java_2.png}
-	\caption[Java vs.\ Rust interaction time for large values.]{Comparison of interaction time for the \textit{fetch} connector for both Java and Rust backends moving 64-kilobyte-sized data. The Rust backend moves the datum by value, while the Java parallel `java\_reference' aliases the object (moving by reference). This backend does not support semantics-preserving value-passing. We achieve safety here by the coordinator injecting \code{clone} operations of byte arrays to mirror Rust's bit-wise copy, called `java\_value'. Note the logarithmic y-axis.}
+	\caption[Java vs.\ Rust interaction time for large values.]{Comparison of interaction time for the \textit{fetch} connector for both Java and Rust backends moving 64-kilobyte-sized data. The Rust backend moves the datum by value, while the Java parallel \texttt{java\_reference}  aliases the object (moving by reference). This backend does not support semantics-preserving value-passing. We achieve safety here by the coordinator injecting \code{clone} operations of byte arrays to mirror Rust's bit-wise copy, called \texttt{java\_value} . Note the logarithmic y-axis.}
 	\label{fig:rust_v_java_2}
 \end{figure}
 
@@ -115,12 +115,12 @@ Concretely, we examine the \textit{fifo1} connector. At these small scales, it m
 The comparison become more interesting when we apply Reo-rs to more complex problems that actually make use of its more expressive features such as synchrony and state. The \textit{alternator} is a canonical Reo circuit that routes messages from putters $\{P_0, P_1\}$ to getter $G$ in an alternating fashion (starting with $P_0$). The semantics of this connector are subtly different from that of a \textit{sequencer}; namely, the alternator only routes data when all three participants are simultaneously ready, after which $G$ receives a pair of messages in succession. The connector's semantics achieve this by transmitting the first value synchronously, and the dispatching latter asynchronously. 
 
 
-Listing~\ref{fig:alternator} shows how Reo-rs fares against a hand-crafted solution. The more complex the connectors become, the more difficult it is to build hand-crafted solutions such that their comparison is fair and meaningful. We aim to keep things simple, relying on an intuitive implementation that relies on synchronous and asynchronous \code{crossbeam} channels, corresponding intuitively with the alternator's constituent primitive channels, and simple \code{Barrier} structures from Rust's standard library module \code{std::sync} to impose synchrony. As before, the performance of Reo-rs surpasses that of our hand-crafted solution for very large values, likely as a result of relying on \code{crossbeam}, whose slowdown was previously observed in Figure~\ref{fig:exper_rtt} previously. More interesting is the observation that while Reo-rs is still markedly inferior for small values, the gap has closed significantly. For this more complicated connector, the overhead of synchronization is common to both implementations in one form or another. The figure also distinguishes the performance of Reo-rs according to whether putters used the safe or unsafe variants of their API (\code{put} and \code{put\_raw} respectively).
+Listing~\ref{fig:alternator} shows how Reo-rs fares against a hand-crafted solution. The more complex the connectors become, the more difficult it is to build hand-crafted solutions such that their comparison is fair and meaningful. We aim to keep things simple, relying on an intuitive implementation that relies on synchronous and asynchronous \code{crossbeam} channels, corresponding intuitively with the alternator's constituent primitive channels, and simple \code{Barrier} structures from Rust's standard library module \code{std::sync} to impose synchrony. This implementation is available for inspection as Listing~\ref{listing:alternator_manual} in the appendix. As before, the performance of Reo-rs surpasses that of our hand-crafted solution for very large values, likely as a result of relying on \code{crossbeam}, whose slowdown was previously observed in Figure~\ref{fig:exper_rtt} previously. More interesting is the observation that while Reo-rs is still markedly inferior for small values, the gap has closed significantly. For this more complicated connector, the overhead of synchronization is common to both implementations in one form or another. The figure also distinguishes the performance of Reo-rs according to whether putters used the safe or unsafe variants of their API (\code{put} and \code{put\_raw} respectively).
 
 \begin{figure}
 	\centering
 	\includegraphics[width=0.80\textwidth]{experiments/alternator.png}
-	\caption[Hand-crafted vs.\ Reo-generated Alternator.]{Overhead.}
+	\caption[Hand-crafted vs.\ Reo-generated alternator.]{Mean interaction duration of the Reo-generated alternator in comparison to an intuitive implementation based on channel primitives in the \code{crossbeam} crate. For large values, the performance of Reo-rs is distinguished according to whether the safe or unsafe port-API is used.}
 	\label{fig:alternator}
 \end{figure}
 
