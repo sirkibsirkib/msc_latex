@@ -28,31 +28,30 @@ bil = thou*thou*thou
 ### 100_000 data movements
 ### 10 reps with fresh proto objects
 
-x = c(0, 2^(1:14))
-reps = 100000
-mpsc = c(9.29991, 10.65254, 10.5035, 10.92912, 10.03323, 10.07968, 11.2787,
-         12.20944, 16.24493, 25.9815, 28.36046, 38.37119,
-         69.29128, 163.17103, 276.16403);
-reo = c(63.13461, 65.14954, 66.80122, 63.49879, 64.86871, 66.98967, 69.14193,
-      69.47564, 76.61765, 89.04745, 114.10968, 134.26562,
-      181.08886, 299.73297, 903.00934);
+x = 2^c(0,2,4,6,8, 10, 12, 14, 16, 18)
+option = c(60, 60, 62, 64, 67, 65, 336, 1131, 4773, 22428);
+heapptr = c(60, 58, 61, 61, 60, 87, 128, 313, 1165, 5690)
+reo_raw = c(613, 609, 615, 624, 612, 693, 755, 1517, 3957, 19526)
+crossbeam = c(101, 94, 95, 101, 214, 317, 886, 3764, 19652, 119739)
+
+reo_rs = c(662, 621, 642, 612, 658, 655, 773, 1432, 3923, 20072);
 
 mypng("rtt_0.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat = matrix(c(mpsc, reo), ncol=2)
-matplot(x, dat/reps/thou*bil, log='x', type='b', pch=1:2, xlab="data size (bytes)",
-     ylim=c(1, 3010), ylab = "Mean RTT (ns)")
-revd=c(2,1)
-legend("topleft", legend=c("fifo1", "mpsc channel") , col=revd,  ncol=1, 
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd
+dat = matrix(c(reo_raw, crossbeam, option, (heapptr-58)*2+58), ncol=4)
+matplot(x, dat/thou, log='x', type='b', pch=1:4, xlab="data size (bytes)",
+     ylab = "Mean RTT (μs)", ylim=c(0, max(c(option, reo_rs))*1.1/thou))
+legend("topleft", legend=c("reo-rs", "channel", "option", "copy") , col=1:4,  ncol=1, 
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=1:4
 )
 dev.off()
 
 mypng("rtt_1.png")
 op <-par(mar = c(5.1, 4.1, 1.8, 1.8))
-dat = matrix(c(reo, mpsc), ncol=2)
-plot(x, (reo-mpsc)/reps/thou*bil, log='x', type='b', pch=3, col=3, lty=3,
-     xlab="data_size (bytes)", ylim=c(1, 3010), ylab = "fifo1 RTT overhead (ns)")
+matplot(x, dat/thou, log='xy', type='b', pch=1:2, xlab="data size (bytes)", ylab = "Mean RTT (μs)")
+legend("topleft", legend=c("reo-rs", "channel", "option", "copy") , col=1:4,  ncol=1, 
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=1:4
+)
 dev.off()
 
 
@@ -275,20 +274,21 @@ dev.off()
 
 
 ###################################
+### experiments/test_8
 ### reo-rs vs handmade alternator
 
-x =          c(4,    8,    16,   32,   64,   128,  256,  512,  1024, 2048, 4096);
-y_wrong___ = c(1658, 1620, 1617, 1704, 1698, 1733, 2013, 2014, 2609, 2956, 4529);
-y_handmade = c(1674, 1693, 1700, 1722, 1764, 1728, 1743, 1845, 2077, 2946, 4147);
-y_reorsput = c(1448, 1500, 1475, 1475, 1598, 1583, 1893, 1912, 2281, 3316, 7865);
-y_crossbea = c(1097, 1198, 1072, 1134, 1060, 1126, 1175, 1347, 1470, 2373, 3454);
+x =          c(4,    8,    16,   32,   64,   128,  256,  512,  1024, 2048, 4096, 8192);
+y_crossbea = c(1108, 1079, 1111, 1125, 1107, 1181, 1203, 1302, 1481, 2212, 3541, 11717);
+y_reorsput = c(1483, 1576, 1996, 1458, 1462, 1581, 1731, 1550, 1688, 1982, 2770, 3717);
+xlil = c(1024, 2048, 4096, 8192)
+y_reorsputlil = c(1618, 1747, 1881, 2371)
 dat <- matrix(c(y_handmade, y_reorsput), ncol=2);
 
 mypngbig("alternator.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 dat = matrix(c(y_crossbea, y_reorsput), ncol=2)
 matplot(x, dat/thou, type = "b", lty=1:2, col=1:2, log='x', ylab="interaction duration (μs)", xlab="data size (bytes)", pch=1:2, ylim=c(0,8)) #plot
-lines(c(1024, 2048, 4096), c(2164, 2941, 6062)/thou, type="b", col=3, pch=3)
+lines(xlil, y_reorsputlil/thou, type="b", col=3, pch=3)
 revd=c(2,3,1)
 legend("topleft", legend=c("reo-rs", "reo-rs (unsafe reference API)","handmade") , col=revd,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=revd)
@@ -298,16 +298,20 @@ dev.off()
 
 
 ############################
+### experiments/test_9
 ### mem refpass
 # clone type data 8192 (moving through fifoM connector)
 put_get = c(4971, 5063, 5121, 5235, 5290, 5385, 5523, 5700, 5828, 5988, 6604, 6357, 6380, 6561, 6783, 7013, 7180, 7531, 7893, 7929, 8022, 8259)
 rawput_get = c(3305, 3419, 3450, 3506, 3539, 3701, 3759, 3953, 4232, 4309, 4512, 4612, 4690, 5075, 5159, 5436, 5524, 5708, 5928, 6157, 6503, 6737)
 rawput_getsig = c(1558, 1578, 1651, 1751, 1880, 2008, 2215, 2507, 2461, 2523, 2630, 2794, 2941, 3098, 3320, 3661, 3667, 3960, 4237, 4382, 4611, 4848)
+put_getsig = c(3339, 3248, 3329, 3531, 3621, 3727, 3860, 4015, 4207, 4356, 4518, 4697, 4902, 5083, 5230, 5490, 5594, 5919, 6146, 6276, 6519, 6750)
 mypngbig("fifo_m.png")
+nums = c(1:4)
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat = matrix(c(put_get, rawput_get, rawput_getsig), ncol=3)
-matplot(x=(1:22), dat/thou, ylim=c(0, max(taken)/thou*1.16), type='b', ylab="duration (μs)", xlab="fifo buffer slots", pch=1:3, lty=1:3)
-leggy = c("both", "only_get", "neither")
-legend("topleft", legend=leggy , col=1:3,  ncol=1,
-       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=1:3)
+dat = matrix(c(put_get, rawput_get, put_getsig, rawput_getsig), ncol=4)
+matplot(x=(1:22), dat/thou, ylim=c(0, max(put_get)/thou*1.3), type='b', ylab="duration (μs)", xlab="fifo buffer slots", pch=nums, lty=nums, col=nums)
+leggy = c("put_in_out", "in_out", "put_in", "in")
+legend("topleft", legend=leggy , col=nums,  ncol=1,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=nums)
 dev.off()
+

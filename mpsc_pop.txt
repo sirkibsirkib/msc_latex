@@ -1,28 +1,32 @@
-std::sync::mpsc::spsc_queue::Queue<T,ProducerAddition,ConsumerAddition>::pop:
-        push    rbp
-        mov     rbp, rsp
-        push    r15
-    /* 10 lines omitted */ 
-        je      .LBB2_2
-        mov     byte ptr [rsp + 288], 2
-        movaps  xmm0, xmmword ptr [rsp + 288]
-        movaps  xmm1, xmmword ptr [rsp + 304]
-        movups  xmm2, xmmword ptr [rax]
-        movaps  xmmword ptr [rsp + 272], xmm2
-        movups  xmm15, xmmword ptr [rax + 16]
-        movups  xmm2, xmmword ptr [rax + 32]
-        movaps  xmmword ptr [rsp + 256], xmm2
-        movups  xmm2, xmmword ptr [rax + 48]
-        movaps  xmmword ptr [rsp + 240], xmm2
-        movups  xmmword ptr [rax + 16], xmm1
-        movups  xmmword ptr [rax], xmm0
-        movups  xmm0, xmmword ptr [rax + 64]
-        movaps  xmmword ptr [rsp + 224], xmm0
-        movups  xmm0, xmmword ptr [rax + 80]
-        movaps  xmmword ptr [rsp + 192], xmm0
-        movups  xmm0, xmmword ptr [rax + 96]
-        movaps  xmmword ptr [rsp + 208], xmm0
-        movups  xmm0, xmmword ptr [rax + 112]
-        movaps  xmmword ptr [rsp + 160], xmm0
-        movups  xmm0, xmmword ptr [rax + 128]
-    /* 153 lines omitted */ 
+        mov     eax, 131096
+        call    __rust_probestack
+        sub     rsp, rax
+        lea     rdi, [rsp + 9]
+        mov     edx, 65536
+        mov     esi, 2
+        call    qword ptr [rip + memset@GOTPCREL]
+        mov     byte ptr [rsp + 8], 1
+        mov     byte ptr [rsp + 65552], 0
+        mov     eax, 32
+.LBB0_1:
+        movups  xmm0, xmmword ptr [rsp + rax - 24]
+        movups  xmm1, xmmword ptr [rsp + rax - 8]
+        movups  xmm2, xmmword ptr [rsp + rax + 8]
+        movups  xmm3, xmmword ptr [rsp + rax + 24]
+        movups  xmm4, xmmword ptr [rsp + rax + 65520]
+        movups  xmm5, xmmword ptr [rsp + rax + 65536]
+        movups  xmm6, xmmword ptr [rsp + rax + 65552]
+        movups  xmm7, xmmword ptr [rsp + rax + 65568]
+        movups  xmmword ptr [rsp + rax - 24], xmm4
+        movups  xmmword ptr [rsp + rax - 8], xmm5
+        movups  xmmword ptr [rsp + rax + 65520], xmm0
+        movups  xmmword ptr [rsp + rax + 65536], xmm1
+        movups  xmmword ptr [rsp + rax + 24], xmm7
+        movups  xmmword ptr [rsp + rax + 8], xmm6
+        movups  xmmword ptr [rsp + rax + 65552], xmm2
+        movups  xmmword ptr [rsp + rax + 65568], xmm3
+        add     rax, 64
+        cmp     rax, 65538
+        jb      .LBB0_1
+        add     rsp, 131096
+        ret
