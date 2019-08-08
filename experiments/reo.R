@@ -57,86 +57,52 @@ dev.off()
 
 #########################################################
 ### "SIMO" group getting. N-way replicator with COPY type data
-### x represents changing data size in bytes (0,1,2,4,8,16)  x gives q where bytes=q&2-1
-### 25_000 data movements
-### 100 reps with fresh proto objects
+### 
 
-x = c(0,2^4,2^8,2^12,2^16);
-getters1 = c(532, 544, 570, 990, 6241);
-getters2 = c(941, 979, 1028, 1805, 9336);
-getters3 = c(1712, 1678, 1755, 2534, 10868);
-getters4 = c(9735, 9792, 9781, 11697, 19656);
-getters5 = c(11339, 10450, 11031, 12465, 25713)
+x = 2^c(0:11)
+y = c(92, 508, 1174, 1802, 12567, 13195,
+      85, 483, 1148, 1570, 10891, 13152,
+      85, 471, 1144, 1483, 10802, 13166,
+      91, 461, 1238, 1616, 10936, 13180,
+      89, 488, 1439, 1826, 12258, 14540,
+      87, 471, 1757, 2036, 11329, 13443,
+      84, 485, 2046, 3307, 11539, 13892,
+      86, 466, 3151, 4111, 12463, 14821,
+      86, 480, 7311, 10994, 13598, 16597,
+      88, 459, 14459, 15549, 17480, 20451,
+      90, 497, 20913, 22444, 27094, 27837,
+      87, 505, 38490, 44367, 43272, 42934)
+my = matrix(y, ncol = length(x))
+ty = t(my)
 
-mypng("simo_copy_0.png")
+
+mypng("simo_0.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat = matrix(c(getters1, getters2, getters3, getters4, getters5), ncol=5)
-matplot(x, dat/thou, log='x', type='b', pch=1:5, xlab="data size (bytes)", col=1:5, lty=1:5,
-     ylim=c(0.3, 27), ylab = "Mean sync time (μs)")
-revd = rev(1:5)
-legend("topleft", legend=revd , col=revd,  ncol=1,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd
+matplot(x, ty/1000, log='x', type='b', pch=1:6, lty=1:6, col=1:6, ylab="runtime (μs)", xlab="clone work units")
+legend("topleft", legend=c(0:5) , col=1:6,  ncol=6, 
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=1:6
 )
 dev.off()
 
-
-### now plotted relative to getters=1
-mypng("simo_copy_1.png")
+mypng("simo_1.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat = matrix(c(getters2/getters1, getters3/getters1, getters4/getters1, getters5/getters1), ncol=4)
-matplot(x, dat, log='x', type='b', pch=2:5, xlab="data size (bytes)",
-     ylim=c(0.8, 20), ylab = "Ratio vs getters=1", col=2:5, lty=2:5)
-
-abline(h=1, col=1, lty=1)
-revd = rev(2:5)
-legend("left", legend=revd , col=revd,  ncol=1,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd
+matplot(x, ty/1000, log='xy', type='b', pch=1:6, lty=1:6, col=1:6, ylab="runtime (μs)", ylim=c(0.06, 120), xlab="clone work units")
+legend("topleft", legend=c(0:5) , col=1:6,  ncol=6, 
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=1:6
 )
 dev.off()
 
-
-#########################################################
-### "SIMO cloning" group getting. N-way replicator with CLONE type data
-### x is the time in WORK UNITS for some arbitrary clone operation.
-
-x =        c(4,     8,     16,    32,    64,    128,   256,   512,   1024,  2048,  4096,  8192);
-getters1 = c(697,   633,   663,   671,   683,   678,   667,   797,   926,   820,   940,   745);
-getters2 = c(1872,  1849,  1960,  1883,  2336,  4682,  3626,  8554,  28168, 24925, 52270, 66560);
-getters3 = c(3878,  5019,  4979,  3421,  3161,  4996,  8398,  13045, 18986, 32706, 49233, 77842);
-getters4 = c(15510, 12252, 10923, 12419, 13574, 12961, 13218, 15832, 19988, 33457, 51436, 90750);
-getters5 = c(14513, 13862, 13880, 14020, 15721, 16185, 15658, 18702, 20822, 31647, 55072, 92740);
-
-mypng("clone_compete_0.png")
+mypngbig("simo_2.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat <- matrix(c(getters1, getters2, getters3, getters4, getters5), ncol=5);
-matplot(x, dat/thou, log='xy', type="b", pch=1:5, xlab="clone work units",
-        ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1:5, lty=1:5, xlim=c(4, 12000))
-revd = rev(1:5)
-legend("right", legend=revd , col=revd,  ncol=1,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd)
-dev.off()
-
-mypng("clone_compete_1.png")
-op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat = matrix(c(getters1, getters2, getters3, getters4, getters5), ncol=5)
-matplot(x, dat/thou, log='', type="l", xlab="clone work units",
-     ylim=c(0.5, 100), ylab = "mean sych time (μs)", col=1:5, lty=1:5)
-revd=rev(1:5)
-legend("topleft", legend=revd , col=revd,  ncol=1,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", lty=revd)
+ty2 <- ty[,-c(1,2,3)]
+matplot(x, ty2/ty[,3], log='xy', type='b', pch=4:6, ylab="runtime factor relative to |g|=2", lty=4:6, col=4:6, xlab="clone work units")
+legend("left", legend=c("|g|=5", "|g|=4", "|g|=3") , col=rev(4:6),  ncol=1, 
+       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=rev(4:6)
+)
+abline(h=1, col=1)
 dev.off()
 
 
-mypngbig("clone_compete_2.png")
-op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-dat <- matrix(c(getters3/getters2, getters4/getters2, getters5/getters2), ncol=3);
-matplot(x, dat, log='x', type="b", pch=3:5, xlab="clone work units",
-     ylim=c(0.5, 8), ylab = "synch time relative to getters=2", col=3:5, lty=3:5)
-abline(h=1, col=2)
-revd = rev(3:5)
-legend("topright", legend=revd , col=revd,  ncol=1,
-       y.intersp=1.3, cex=1, xjust=0, bty = "n", pch=revd)
-dev.off()
 
 
 
