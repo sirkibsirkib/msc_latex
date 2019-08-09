@@ -37,8 +37,8 @@ crossbeam = c(101, 94, 95, 101, 214, 317, 886, 3764, 19652, 119739)
 reo_rs = c(662, 621, 642, 612, 658, 655, 773, 1432, 3923, 20072);
 
 mypng("rtt_0.png")
-op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 dat = matrix(c(reo_raw, crossbeam, option, (heapptr-58)*2+58), ncol=4)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 matplot(x, dat/thou, log='x', type='b', pch=1:4, xlab="data size (bytes)",
      ylab = "Mean RTT (μs)", ylim=c(0, max(c(option, reo_rs))*1.1/thou))
 legend("topleft", legend=c("reo-rs", "channel", "option", "copy") , col=1:4,  ncol=1, 
@@ -102,8 +102,8 @@ legend("topleft", legend=c(0:5) , col=1:6,  ncol=6,
 dev.off()
 
 mypngbig("simo_2.png")
-op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 ty2 <- ty[,-c(1,2,3)]
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 matplot(x, ty2/ty[,3], log='xy', type='b', pch=4:6, ylim=c(0.8, 14),
         ylab="runtime factor relative to |g|=2", lty=4:6, col=4:6, xlab="clone work units")
 legend("left", legend=c("|g|=5", "|g|=4", "|g|=3") , col=rev(4:6),  ncol=1, 
@@ -150,8 +150,8 @@ y4 = c(271, 1845, 3533, 4751, 6293, 8941, 11445, 11088, 12416, 13894,
 
 leggy = c("guard", "false",  "swap", "ands", "alloc");
 mypng("check_time_0.png")
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 dat <- matrix(c(y1-239, y2-239, y2b-239, y3-239, y4-239), ncol=5);
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 matplot(x, dat/thou, type="l", lty=1:5, col=1:5, ylab="overhead (μs)", xlab="unsatisfied rules") #plot
 legend("topleft", legend=leggy , col=1:5,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:5)
@@ -180,7 +180,7 @@ leggy = c("10% full", "50% full", "90% full")
 
 mypng("bits_0.png")
 dat <- matrix(c(bits1, bits5, bits9), ncol=3);
- op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 matplot(x, dat, type="b", pch=1:3, lty=1:3, col=1:3, log='x', ylab="run time (ns)", xlab="number of ports", ylim=c(0, 280)) #plot
 legend("topleft", legend=leggy , col=1:3,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=1:3)
@@ -260,8 +260,8 @@ xlil = c(1024, 2048, 4096, 8192)
 y_reorsputlil = c(1618, 1747, 1881, 2371)
 
 mypngbig("alternator.png")
-op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 dat = matrix(c(y_reorsput, y_crossbea), ncol=2)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 matplot(x, dat/thou, type = "b", lty=1:2, col=1:2, log='x', ylab="interaction duration (μs)", xlab="data size (bytes)", pch=1:2, ylim=c(0,8)) #plot
 lines(xlil, y_reorsputlil/thou, type="b", col=4, pch=4)
 revd=c(1,4,2)
@@ -282,8 +282,8 @@ rawput_getsig = c(1558, 1578, 1651, 1751, 1880, 2008, 2215, 2507, 2461, 2523, 26
 put_getsig = c(3339, 3248, 3329, 3531, 3621, 3727, 3860, 4015, 4207, 4356, 4518, 4697, 4902, 5083, 5230, 5490, 5594, 5919, 6146, 6276, 6519, 6750)
 mypng("fifo_m_0.png")
 nums = c(1:4)
-op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 dat = matrix(c(put_get, rawput_get, put_getsig, rawput_getsig), ncol=4)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 matplot(x=(1:22), dat/thou, ylim=c(0, max(put_get)/thou*1.3), type='b', ylab="duration (μs)", xlab="fifo buffer slots", pch=nums, lty=nums, col=nums)
 leggy = c("put_in_out", "in_out", "put_in", "in")
 legend("topleft", legend=leggy , col=nums,  ncol=1,
@@ -292,8 +292,10 @@ dev.off()
 
 mypng("fifo_m_1.png")
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
-plot(x=(1:22), put_get/thou, type='b', ylab="duration (μs)", xlab="fifo buffer slots", ylim= c(0, max(put_get/thou)*1.8), xlim=c(0, 24))
+plot(x=(1:22), put_get/thou, type='b', ylab="duration (μs)", xlab="fifo buffer slots", ylim= c(0, max(put_get/thou)*2), xlim=c(0, 26))
 pg1 = put_get[1]/thou
 abline(0, pg1,  col=2, lty=2)
 abline(pg1, 0,  col=3, lty=3)
+legend("topright", legend=c("put_in_out", "linear", "constant") , col=1:3,  ncol=1,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", lty=1:3, pch=1:3)
 dev.off()
