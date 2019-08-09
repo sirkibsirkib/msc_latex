@@ -55,7 +55,7 @@ legend("topleft", legend=c("reo-rs", "channel", "option", "copy") , col=1:4,  nc
 dev.off()
 
 
-mypngbig("rtt_for_pres.png")
+mypng("rtt_for_pres.png")
 op <-par(mar = c(5.1, 4.1, 1.8, 1.8))
 matplot(x, dat[,-3]/thou, log='xy', type='b', pch=1:4, xlab="data size (bytes)", ylab = "Mean RTT (μs)")
 legend("topleft", legend=c("reo-rs", "channel", "memcpy") , col=1:4,  ncol=1, 
@@ -254,12 +254,12 @@ dev.off()
 ### reo-rs vs handmade alternator
 
 x =          c(4,    8,    16,   32,   64,   128,  256,  512,  1024, 2048, 4096, 8192);
-y_crossbea = c(1108, 1079, 1111, 1125, 1107, 1181, 1203, 1302, 1481, 2212, 3541, 11717);
-y_reorsput = c(1483, 1576, 1996, 1458, 1462, 1581, 1731, 1550, 1688, 1982, 2770, 3717);
-xlil = c(1024, 2048, 4096, 8192)
-y_reorsputlil = c(1618, 1747, 1881, 2371)
+y_crossbea = c(1100, 1141, 1220, 1125, 1107, 1237, 1203, 1372, 1481, 2212, 3619, 13113);
+y_reorsput = c(1459, 1505, 1485, 1458, 1462, 1484, 1731, 1631, 1688, 1982, 2770, 3717);
+xlil = c(512, 1024, 2048, 4096, 8192)
+y_reorsputlil = c(1500, 1618, 1747, 1847, 2295)
 
-mypngbig("alternator.png")
+mypng("alternator_0.png")
 dat = matrix(c(y_reorsput, y_crossbea), ncol=2)
 op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
 matplot(x, dat/thou, type = "b", lty=1:2, col=1:2, log='x', ylab="interaction duration (μs)", xlab="data size (bytes)", pch=1:2, ylim=c(0,8)) #plot
@@ -267,6 +267,17 @@ lines(xlil, y_reorsputlil/thou, type="b", col=4, pch=4)
 revd=c(1,4,2)
 legend("topleft", legend=c("reo-rs", "reo-rs (unsafe reference API)","handmade") , col=revd,  ncol=1,
        y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=revd)
+dev.off()
+
+
+mypng("alternator_1.png")
+dat = matrix(c(y_reorsput, y_crossbea), ncol=2)
+op <- par(mar = c(5.1, 4.1, 1.5, 1.5))
+plot(x, y_reorsput/y_crossbea, type = "b", lty=1, col=1, log='x', ylab="slowdown wrt. handmade", xlab="data size (bytes)", pch=1, ylim=c(0,1.6)) #plot
+lines(xlil, y_reorsputlil/y_crossbea[8:12], type="b", col=4, pch=4)
+abline(h=1, lty=2, col=2)
+legend("bottomleft", legend=c("reo-rs", "reo-rs (unsafe reference API)") , col=c(1,4),  ncol=1,
+       y.intersp=1.1, cex=1, xjust=0, bty = "n", pch=c(1,4))
 dev.off()
 
 

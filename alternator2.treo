@@ -1,0 +1,5 @@
+alternator2(A?, B?, C!){
+	syncdrain(A, B)
+	fifo1(A, C)
+	sync(B, C)
+}

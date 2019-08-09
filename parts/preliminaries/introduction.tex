@@ -6,7 +6,7 @@ Traditional, sequential programming has been changing for decades. Over time, la
 %Reo is an exogenous coordination language developed at the CWI in Amsterdam. A Reo specification defines a \textit{connector}, which 
 
 Reo is an exogenous coordination language developed at the CWI in Amsterdam. Like Linda, Reo raises the level of abstraction in coordination actions by restricting the interface between distinct system \textit{components}. Rather than actions on \textit{tuples} in a global scope, Reo components act on local \textit{ports}. Reo differs from Linda by avoiding a vestige of the connection to the world of sequential programming: \textit{action-centricism}. The traditional approach of making explicit each actor's actions and \textit{deriving} the interactions is turned on its head. The implementation of coordinated components is agnostic to the system beyond their local ports, only acting in accordance with their local computation. Systems are built by linking these components together by specifying their relationship in a Reo \textit{connector}. The Reo language defines the ways in which ports are permitted to \textit{interact}. 
-
+\hl{TODO}
 Separately, components are linked together by specifying a \textit{connector} in the Reo language, constraining permitted interactions by enumerating \textit{relations} between ports. When used in this
 
 Reo components are oblivious to the system beyond, and thus, only act in accordance with the needs of their local computation, sending and receiving data through their ports. 

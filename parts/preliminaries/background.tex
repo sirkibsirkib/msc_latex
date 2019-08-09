@@ -20,46 +20,22 @@ The Reo language has applicability whenever there is a benefit in being able to 
 
 \subsection{Language}
 \label{sec:reo_lang}
+\hl{TODO add cites}
+Reo is a graphic language which represents a system as a \textit{connector}, a multi-graph which defines the relationships between its nodes. Nodes represent logical `locations' which may observe a single datum at a time. Ultimately, a connector's relations boil down to Reo's underlying semantics, of which there are several to choose from (explained in Section~\ref{sec:semantic_models} to follow). They have in common that they constrain the synchronous observations of data at nodes. For example, a connector may enforce that nodes~$A$ and~$B$ always observe the same data element. This is known as the \textit{sync} channel, a a primitive sufficiently ubiquitous to be represented simply as an arrow ($\longrightarrow$) in Reo's graphic syntax. In this fashion, connectors specify the ways in which data is permitted to synchronously `flow' through its nodes. Literature often uses \textit{circuit} as an alternative name for connectors, appropriately evoking the metaphor of electricity, or perhaps fluid pressure as it appears to propagate movement forward and blockages backward synchronously. 
 
-Reo is a graphic language which represents a system as a \textit{connector}, a multi-graph which defines the relationships between its nodes. Nodes represent logical `locations' which may observe a single datum at a time. Ultimately, a connector's relations boil down to Reo's underlying semantics, of which there are several. They have in common that they constrain the synchronous observations of data at nodes. For example, a connector may enforce that when node~$A$ observes an element~$X$, node~$B$ observes~$X$ also. In this way, connectors specify the ways in which data is permitted to synchronously `flow' through its nodes. Literature often uses \textit{circuit} as an alternative name for connectors, drawing on the appropriate metaphor of electricity, or perhaps fluid pressure as it appears to propagate movement forward and blockages backward synchronously. 
+A tenet of Reo's design philosophy is compositionality (and consequently, modularity). Rather than defining each and every connector anew in terms of the underlying semantics, all but the simplest primitive connectors are built from simpler ones. At each level of this hierarchy, the connector exposes a subset of its nodes to the connector above, wherein they are called \textit{ports}. The metaphor evokes the transmission of data a harbor to the wider world. The set of a connector's ports is called its \textit{interface}, beyond which is its \textit{environment}. A complex connector emerges when it links the ports of its constituent connectors. As the various metaphors suggest, we usually think of data as flowing in a particular \textit{direction}. To this end, ports are usually defined along with an annotation of their \textit{orientation}: \textit{input} ports accept data from the environment (moving downward in the connector hierarchry), and \textit{output} ports are the reverse. With these orientations, port interactions orient the direction of their flow from \textit{source} nodes to \textit{sinks}.
 
-A tenet of Reo's design philosophy is compositionality (and consequently, modularity). Rather than defining each and every connector anew in terms of the underlying semantics, all but the simplest primitive connectors are built from simpler ones. At each level of this hierarchy, the connector exposes a subset of its nodes to the connector above, wherein they are called \textit{ports}. The metaphor evokes the transmission of data a harbor to the wider world. Appropriately, the set of a connectors ports is called its \textit{interface}, beyond which is the connector's \textit{environment}. A complex connector emerges when it links the ports of its simpler, constituent connectors. Reo is made more applicable to the world of computing by defining ports with a fixed \textit{orientation}; \textit{input} ports represent data coming from the environment, and \textit{output} ports are the opposite. With these annotations, it becomes possible to interpret a synchronous \textit{interaction} involving a set of oriented ports as the synchronous propagation of data from sources to sinks. Non-port nodes are \textit{internal}, and are not accessible from the environment. Connectors with empty interfaces are \textit{closed}, and can be understood as `complete' systems. 
+Some Reo primitives (and consequently, some connectors that incorporate them) define relationships in terms of variables whose states can persist into the future. In this way, Reo can model \textit{asynchronous} data flow also, breaking up contiguous networks of synchrony, and constraining future observations in terms of its changing state. The primitive \textit{fifo1} connector is canonical for this purpose; in observing some datum~$X$ on its single input port, an \textit{empty} connector becomes \textit{full}, whereafter it may again become empty by observing~$X$ on its single output port. Despite its simplicity, \textit{fifo1} is sufficient for the expression of arbitrary asynchronous events and for encoding the persistence of any state\footnote{The initially-full variant of \textit{fifo1} allows Reo to express connectors initialized with any imaginable initial state.}.
 
-Some Reo primitives (and consequently, some connectors that incorporate them) define relationships in terms of variables whose states can persist into the future. In this way, Reo can model \textit{asynchronous} data flow also, breaking up contiguous networks of synchrony, and constraining future observations in terms of its changing state. The primitive \textit{fifo1} connector is canonical for this purpose; in observing some datum~$X$ on its single input port, an \textit{empty} connector becomes \textit{full}, whereafter it may again become empty by observing~$X$ on its single output port\footnote{The initially-full variant of \textit{fifo1} allows Reo to express connectors initialized with any imaginable initial state.}. Despite its simplicity, \textit{fifo1} is sufficient for the expression of arbitrary asynchronous events and storing arbitrary state.
-
-\hl{TODO}
-\hl{TODO textual and visual examples eg: alternator}
-%Reo is a \textit{coordination} language. This describes its focus on the specification of the \textit{interactions} between distinct actors. This is in contrast to the usual \textit{action-centric} model common to languages with their roots in sequential programming, where the programs or specifications describe \textit{actions} of entities, relegating any associated interactions to requiring derivation from the actions. In a nutshell, Reo provides a language for describing the behavior of a \textit{system} of actors by explicitly constraining the behavior of the \textit{connector} which serves as their communication medium. 
-%
-%(TODO define connector. same as component just maybe structural?)
-%
-%The Reo language is essentially graphic; each connector defines a relation over named \textit{locations}. Complex connectors are defined as the composition of simpler connectors over its locations. This inherently visual language is also often seen in its textual form, usually in the context of machine parsing. 
-%
-%The simplest \textit{primitive} connectors cannot be subdivided
-%
-%by listing a set of constituent connectors. The simplest primitive Reo connectors are \textit{channels}(TODO channel vs primitive). Channels by definition cannot be subdivided into constituent connectors, as they are defined by either (a) the model that provides Reo's semantics, or (b) opaque components defined in some target language such as C or Java. The nodes themselves are the other important aspect of the language. Ultimately, each node corresponds to a (logical) location which may hold up to one datum at a time. Reo is by default \textit{synchronous}, and relationships between locations propagates that synchrony. \textit{Locations} are divided into two classes according to whether 
-%
-%This motivates the Reo's metaphor of propagation of data and back-propagation of data-constraints, corresponding to its namesake, the Greek word for `flow'. The compositional aspect is meaningful when locations are involved in multiple relationships.
-%
-%\textit{forwards} (by moving data several `hops' at once) and backwards
-%
-%In addition to re-using nodes inside a connector, connectors are able to expose these nodes for re-use in the connectors \textit{above them} by exposing the node in the connector's \textit{interface}. These exposed nodes are called \textit{ports}, leaning on the metaphor of the connector \textit{moving} some data in and out of itself.
-%
-%(data flow corresponds with what happens at runtime, except its SYNCHRONOUS by default. Relate to TDS. Talk about replication and equality checks).
-%
-%(In the context of applications, components that cannot be composed compile to things managed by different threads. at the boundaries, they communicate with ports. Here, there is a meaningful difference between putter and getter. Include example of how a protocol that uses some port A three times still results in a putter-getter pair)
+In the literature, Reo is usually expressed using graphical syntax, representing nodes as one would expect. Building a connector graphically involves drawing connections between nodes as \textit{edges} for the usual binary primitives (\textit{sync}, \textit{fifo1}, etc.), or as \textit{boxes}, exposing ports at their boundaries. In this work, we focus instead on Reo's \textit{textual} syntax instead, as it makes for a more practical interface between human and compiler. In this context, Reo is fundamentally the same, but relies on textual \textit{identifiers} for nodes and connectors as is typical for general-purpose programming languages. Listing~\ref{fig:alternator} gives an example of the \textit{alternator2}, a canonical example connector, just complex enough to demonstrate the composition of primitives.
 
 
-%\subsection{Typical Channels}
-%
-%In principle, Reo does not enforce the use of any primitive channels in particular. Users are free to use channels that are best-suited to their use case. In practice, a small set of exceptionally simple channels are favoured in literature and in practice owing to their versatility. As such, this work presumes that these consititute the majority of the channels out of which our protocols are composed. Below, we enumerate this set of channels and their behavior.
-%
-%\begin{enumerate}
-%	\item sync($I_0, O_0$)
-%	\item fifo1($I_0, O_0$)
-%	\item lossy\_sync($I_0, O_0$)
-%	\item exclusive\_router($I_0, O_0, O_1$)
-%\end{enumerate}
+\begin{listing}[h!]
+	\centering
+	\inputminted{text}{alternator2.treo}
+	\caption[Textual Reo specification of alternator2.]{Textual Reo specification of the \textit{alternator2} connector with input ports~$\{A,B\}$, and output port~$C$. $$}
+	\label{listing:alternator2_treo}
+\end{listing}
 
 
 \subsection{Semantic Models}

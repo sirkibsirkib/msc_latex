@@ -112,16 +112,29 @@ Concretely, we examine the \textit{fifo1} connector. At these small scales, it m
 	\label{fig:exper_rtt}
 \end{figure}
 
-The comparison become more interesting when we apply Reo-rs to more complex problems that actually make use of its more expressive features such as synchrony and state. The \textit{alternator} is a canonical Reo circuit that routes messages from putters $\{P_0, P_1\}$ to getter $G$ in an alternating fashion (starting with $P_0$). The semantics of this connector are subtly different from that of a \textit{sequencer}; namely, the alternator only routes data when all three participants are simultaneously ready, after which $G$ receives a pair of messages in succession. The connector's semantics achieve this by transmitting the first value synchronously, and the dispatching latter asynchronously. 
+The comparison become more interesting when we apply Reo-rs to less trivial connectors that make use meaningful synchrony and state. The \textit{alternator2} is a canonical Reo circuit that routes messages from putters $\{P_0, P_1\}$ to getter $G$ in an alternating fashion (starting with $P_0$). The semantics of this connector are subtly different from that of a \textit{sequencer}; the first value is transmitted once all ports are synchronously ready, and the second value is transmitted asynchronously.
 
+Listing~\ref{fig:alternator2_runtime} shows how Reo-rs fares against a simple hand-crafted solution which maps Reo-rs channel primitives and the connector's synchronization constraint to \code{crossbeam}'s channels and the \code{Barrier} in Rust's standard library, implemented to closely correspond with the specification, available for inspection as Listing~\ref{listing:alternator_manual} in the appendix. Figure~\ref{fig:alternator2_runtime_1} shows that, as before, the performance of Reo-rs far surpasses that of our hand-crafted solution for very large values, likely as a result of relying on \code{crossbeam}, whose slowdown was previously observed in Figure~\ref{fig:exper_rtt}. More interesting is the observation that while Reo-rs is still inferior for small values, the gap has closed significantly across the board, suggesting that the synchronization overhead is more similar in both versions. For completeness sake, and to put out best foot forward, we include the effects of the C-like \textit{unsafe} API variants of Reo-rs port operations explained in Section~\ref{sec:port_operations}.  
 
-Listing~\ref{fig:alternator} shows how Reo-rs fares against a hand-crafted solution. The more complex the connectors become, the more difficult it is to build hand-crafted solutions such that their comparison is fair and meaningful. We aim to keep things simple, relying on an intuitive implementation that relies on synchronous and asynchronous \code{crossbeam} channels, corresponding intuitively with the alternator's constituent primitive channels, and simple \code{Barrier} structures from Rust's standard library module \code{std::sync} to impose synchrony. This implementation is available for inspection as Listing~\ref{listing:alternator_manual} in the appendix. As before, the performance of Reo-rs surpasses that of our hand-crafted solution for very large values, likely as a result of relying on \code{crossbeam}, whose slowdown was previously observed in Figure~\ref{fig:exper_rtt} previously. More interesting is the observation that while Reo-rs is still markedly inferior for small values, the gap has closed significantly. For this more complicated connector, the overhead of synchronization is common to both implementations in one form or another. The figure also distinguishes the performance of Reo-rs according to whether putters used the safe or unsafe variants of their API (\code{put} and \code{put\_raw} respectively).
+The alternator circuit is still simple enough that the hand-crafted implementation is only a few lines long. It is in our best interest to compare the performance of Reo-rs to hand-crafted solutions closer to the expected level of complexity for the use case of Reo. However, as programs become more complex, it becomes more difficult to design fair `objective' handcrafted programs such that the results are meaningful, as their complexity will increase the opportunities for optimizations. We a more complete analysis of the performance of Reo-rs to hand-crafted programs to future work. For now, we conclude that Reo-generated Rust is unlikely to out-perform hand-crafted programs for protocols at the expected level of complexity, but will be generally competitive.
 
 \begin{figure}
 	\centering
-	\includegraphics[width=0.80\textwidth]{experiments/alternator.png}
-	\caption[Hand-crafted vs.\ Reo-generated alternator.]{Mean interaction duration of the Reo-generated alternator in comparison to an intuitive implementation based on channel primitives in the \code{crossbeam} crate. For large values, the performance of Reo-rs is distinguished according to whether the safe or unsafe port-API is used.}
+	\makebox[\textwidth][c]{
+		\begin{subfigure}[b]{0.63\textwidth}
+			\includegraphics[width=\textwidth]{experiments/alternator_0.png}
+			\caption{}
+			\label{fig:alternator2_runtime_0}
+		\end{subfigure}%
+		\begin{subfigure}[b]{0.63\textwidth}
+			\includegraphics[width=\textwidth]{experiments/alternator_1.png}
+			\caption{}
+			\label{fig:alternator2_runtime_1}
+		\end{subfigure}%
+	}
+	\caption[Hand-crafted vs.\ Reo-generated alternator.]{Mean interaction duration of the Reo-generated \textit{alternator2} connector in comparison to an intuitive implementation based on channel primitives in the \code{crossbeam} crate, and the \code{Barrier} from the Rust standard library showing (1) absolute runtimes, and (2) the slowdown factor of Reo-rs compared to the handmade code. Note the logarithmic x-axis.}
 	\label{fig:alternator}
+	\label{fig:alternator2_runtime}
 \end{figure}
 
 \section{Overhead Examined}
@@ -245,12 +258,24 @@ For few work-units, the duration of the interaction was always greater the more 
 \subsection{Reference-Passing Optimization}
 Finally, we perform an experiment to verify that the reference-passing optimization described in Section~\ref{sec:memory_cells} is working as intended. Figure~\ref{fig:fifo_m} shows the results of the mean time taken for a datum to pass through a \textit{fifo-m} connector. This protocol makes trivial use of an $m$-long chain of memory cells. Values originate as input on one end, shifting between cells from head to tail, and finally being output at the tail. All measurements are dominated by the work of \textit{moving} the $2^{13}$-byte values in memory from one place to another. \texttt{shift\_get} represents the most intuitive run, where values are moved twice: once \textit{into} the protocol's storage, and once \textit{out} to the getter. For this protocol, the Rust compiler failed to optimize the logical data-movement of the safe API's \code{put} operation. Runs using this safe variant are prefixed with~\texttt{put\_}, and include an additional value-movement.
 
-As expected, runtimes are seen stratified according to the number of movements they perform. In all cases longer chains of memory cells indeed require more time, but it is significantly less than what would be observed if cells exchanged data by value, incurring more movements; rather than linear speedup, we observe longer chains incurring more overhead evaluating and firing the larger sequence of \textit{rules} to repeatedly shift values within the protocol's memory by reference.
+As expected, runtimes in Figure~\ref{fig:fifo_m_0} are seen stratified according to the number of movements they perform. In all cases, longer chains of memory cells indeed require more time (preventing the runtime to be \textit{constant} with respect to~$m$), but the overhead is relatively small, and does not appear to be affected by the baseline cost of movement; this is expected, as the cost of reference-passing is unrelated to the value's size, or data type in any way.
 
+Figure~\ref{fig:fifo_m_1} shows how the cost of reference-passing compares to the best- and worst-case scenarios for the response of interaction time to the length of the chain. Previously we have observed that Reo-rs experiences some constant overhead per port-interaction (eg.\ in Figure~\ref{fig:exper_rtt_1}), so interaction time would likely remain sub-linear even if it performed value-passing between memory cells na\"ively. However, in most examples (including this one) we can safely presume it's slope would be far steeper than it is now.
 
 \begin{figure}
 	\centering
-	\includegraphics[width=0.80\textwidth]{experiments/fifo_m.png}
-	\caption[RTT for fifo-M connector with $2^{13}$ byte values.]{Round trip time (RTT) of a $2^{13}$ byte value through a \textit{fifo-m} connector with~$m$ ranging from 1 to 20, measuring the time taken from the start of the~\code{put} into the head of the chain, to the end of the \code{get} out of the tail. The experiment was repeated using variations of port-operations to control the number of \textit{memory copies}. \texttt{put\_*} runs move the datum using the safe value-passing API, and others use the unsafe C-like reference-passing API. \texttt{*\_get} runs acquire the output by value, while others participate in synchrony by acquiring a signal.}
+	\makebox[\textwidth][c]{
+		\begin{subfigure}[b]{0.63\textwidth}
+			\includegraphics[width=\textwidth]{experiments/fifo_m_0.png}
+			\caption{}
+			\label{fig:fifo_m_0}
+		\end{subfigure}%
+		\begin{subfigure}[b]{0.63\textwidth}
+			\includegraphics[width=\textwidth]{experiments/fifo_m_1.png}
+			\caption{}
+			\label{fig:fifo_m_1}
+		\end{subfigure}%
+	}
+	\caption[RTT for fifo-M connector with $2^{13}$ byte values.]{Round trip time (RTT) of a $2^{13}$ byte value through a \textit{fifo-m} connector with~$m$ ranging from 1 to 20, measuring the time taken from the start of the~\code{put} into the head of the chain, to the end of the \code{get} out of the tail. (a)~The experiment was repeated using variations of port-operations to control the number of \textit{memory copies}. \texttt{put\_*} runs move the datum using the safe value-passing API, and others use the unsafe C-like reference-passing API. \texttt{*\_get} runs acquire the output by value, while others participate in synchrony by acquiring a signal. (b)~\texttt{put\_in\_out} is compared to the best- and worst-case scenarios for interaction times in response to~$m$.}
 	\label{fig:fifo_m}
 \end{figure}
