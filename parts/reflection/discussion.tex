@@ -51,4 +51,13 @@ Future work might investigate more efficient mechanisms for achieving the same e
 Chapter~\ref{sec:behavior_implementation} explains how Reo-rs uses a lightweight interpreter to implement protocol behavior at runtime, reading rules from a dense data structure. A result of this approach is the ability to alter a protocol object's behavior at runtime arbitrarily by manipulating the data representing its rules. Future work might investigate the introduction of a reconfiguration procedure to change the protocol without tearing the instance down or influencing the compute components in motion. The use of an interpreter trivializes the work of manipulating the rules themselves, but care must be taken to change the protocol object's \textit{meta-state} safely such that it results in a new protocol which is again internally consistent (eg.\ reconfiguring the structures used for primitive concurrency, message channels etc.).
 
 \section{Conclusion}
+1. we were able to implement protocol comp
+4. imperative form was made out of necessity, but it has promise for code generation in other languages, and even for specialization of other rust code generators. we follow the trend of fragmenting our programs to create composable modules that come together to form a pipeline. kinda reo-like really.
+2. code generation was more complex than expected, particualrly when optimiztions were involved
+3. rust's ownership system was not as useful in the way we expected. but it was useful for our API, generics, affinity and for its other productivity features.
+5. would have liked to investigate static governors more thoroughly
+6. would have liked to explore procedural macros. we are doing meta-programming and macros seem like a good fit, offering promise for application in both: (a) translating imperative form to rust safely (cite NOM) and (b) making static governors emit more meaningful errors.
+
+
+
 \hl{TODO}
