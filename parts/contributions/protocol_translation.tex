@@ -1,4 +1,4 @@
-\chapter{Code Generation}
+\chapter{Protocol Translation}
 \label{sec:imperative_form}
 In this chapter, we describe the process of translating the Reo compiler's internal representation of a protocol specification into an executable \textit{protocol object} in the Rust language.
 
@@ -96,7 +96,7 @@ For our purposes, omitting a source identifier $s$ from~$M$ can be interpreted a
 
 
 
-\section{Code Generation Pipeline}
+\section{Translation Pipeline}
 In this section we explore the translation procedure of protocols, starting from their declarative Reo specification in the Reo compiler's internal representation to executable Rust. This is done in two distinct phases, as explained in Section~\ref{sec:decoupling_reo_rust}. 
 
 \subsection{Phase 1: Reo Compiler Backend}
