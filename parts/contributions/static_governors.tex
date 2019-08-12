@@ -1,6 +1,6 @@
 \chapter{Generating Static Governors}
 \label{sec:api}
-A protcol's \textit{governor} acts to ensure that all the actions of a component are \textit{adherent} to the protocol with which it interfaces, guaranteeing that its actions will not violate the protocol. In this section, we develop a means of embedding governors into Rust's affine type system. As a result, an application developer may ergonomically opt-into checking protocol adherence of their own compute-code using their local Rust compiler, whereafter successful compilation guarantees adherence to the protocol.
+A protcol's \textit{governor} acts to ensure that all the actions of some component are \textit{adherent} to the protocol with which it interfaces, guaranteeing that its actions will not violate the protocol. In this section, we develop a means of embedding governors into Rust's affine type system. As a result, an application developer may ergonomically opt-into checking protocol adherence of their own compute-code using their local Rust compiler, whereafter successful compilation guarantees adherence to the protocol.
 
 In more precise terms, let protocol $A$ be \textit{protocol adherent} to protocol $B$ if and only if the \textit{synchronous composition} of $A$ and $B$ is language-equivalent to $B$; equivalently, $A$ is adherent to $B$ and $A$ adheres to $B$. This can be understood as $A$ contributing no constraints to the composed system that $B$ did not have already.
 
