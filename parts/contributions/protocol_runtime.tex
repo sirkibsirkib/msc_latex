@@ -2,6 +2,16 @@
 \label{sec:protocol_runtime}
 In this section we explore the Rust implementation of Reo-generated protocol objects. Rather than generating the needed structures and behaviour from scratch each time, the Rust back-end follows the precedent of the well-established Java back-end and relies on a single, re-usable dependency for the work common to all protocols. Here, we explore the implementation of this \textbf{Reo-rs} library, picking up where we left off from the generation step in Chapter~\ref{sec:imperative_form} above.
 
+\section{Task of the Protocol Runtime}
+Users of any language supported by the Reo compiler are able to extract the coordination logic of their programs, collecting it into a self-contained Reo protocol specification. Once compiled, the  
+
+Regardless of the language, proto
+
+1. it must be constructed, linked together with compute code. threads act on boundary ports with put and get. 
+2. from the outside, port operations can act on the ports chaotically, they appear to soometimes block and eventually succeed. data is consumed and aata is produced. globally, the program adheres to the specification of the corresponding reo connector
+3. internally
+
+
 \section{Examining the Java Implementation}
 \label{sec:java_examined}
 The work of this project can draw from the efforts of previous work on the Reo Compiler. The Java implementation in particular has seen the most frequent and recent updates. This section treats the Java code generator as a touchstone for Reo-generated application code in general. We give a brief overview of the properties inherent to the generated code, and consider the effects of projecting the underlying ideas to the Rust language.
