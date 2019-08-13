@@ -78,15 +78,6 @@ For our purposes, it is useful to allow values to \textit{become invalid}. In th
 
 Ultimately, we elaborate our notion of value validity to correspond more closely with the actions an affine-typed compiler would perform: in reading over actions from top to bottom, \textit{inaccessible} identifiers become \textit{accessible} when their values are created, and accessible identifiers become inaccessible if their values are explicitly emptied. A variable access is valid only if it was accessible at the end of the previous action. This formulation makes clear the need of some means of deciding which values are \textit{initially accessible}. Our solution is made apparent in the definition of IF to follow.
 
-%The imperative form representation includes specifies that a temporary variable $f_X$ be computed and stored. By assumption~1, the decision of firing these rules must follow the creation of these variables, clearly putting these actions in $S_a$. This matches our intuition: the guard may be unsatisfied, requiring that the creation of the temporary variables be reversed, ie.\ the temporary values are discarded silently.
-%
-%A final elaboration on the sequence of actions is necessary to account for every memory cell whose value~$x$ is synchronously read and overwritten. Reo's internal representation inherits syntax from \textit{temporal logic} to disambiguate reads before and after overwrites for such cases: $m$ and $m'$ represent the current and `next' values respectively, with overwriting occurring in-between. The common solution to such problems in an imperative context is to first \textit{move} the value to a temporary variable. To this end, we define an action for \textit{swapping} the contents of two memory cells (which may be empty or full). Such an action is intuitive for most imperative languages, and can be trivially \textit{reversed} such that it may be included in $S_a$ if needs be.
-
-%\subsubsection{Data Movement}
-%The Reo compiler's internal representation represents all a rule's \textit{observable effects} as a set of assignments. Equivalently, assignments are a partial mapping from \textit{destination} (any persistent location able to accept values ie.\ \textit{getter} ports or empty memory cells) to their assigned value. Imperative form has in common that it represents all observable effects as these assignments in this concurrent fashion. Concretely, $S_b$ is always defined as a single, coarse-grained action specifying the destination of values in the result of the rule firing. However, it represents this mapping turned on its head; expressed as a mapping from \textit{source} (a set of values) to sets of destinations. This representation is chosen for its orientation making more easy to track the movement of each datum. The intuition is that this representation makes it easier to treat values as \textit{resources} that potentially require delicate management. Depending on the nature of the target language, it may be necessary to check the \textit{affinity} (see Section~\ref{sec:affine_type_systems}) of these values, as it becomes of paramount importance to control the number of destinations per value. As the imperative form is language-agnostic, it makes no attempt to rectify this problem itself, relying on the $T_{run}$ task to resolve the problems in the manner befitting the target language. As an example, the Rust language is concerned with the \textit{affinity} of some its data types, and must explicitly create new affine resources with an explicit \code{clone} operation. This is discussed further in Section~\ref{sec:translation_phase_2} to follow.
-%
-%This movement representation also makes clear the cases for which a value goes \textit{unused}. \textit{Relevant} or \textit{linear} type systems may wish to reject such protocols, or insert explicit operations to handle the equivalent effect, as their definition forbids the destruction of data elements\footnote{For example, a linear imperative language may wish to simulate data destruction by injecting the special \code{Destroyed} destination for otherwise empty destination sets.}. Languages with explicit \textit{memory management} may need to address the cases of data destruction with the injection of special handlers. For example, the C language may necessitate the injection of a \code{free} call to avoid leaking memory.
-
 \subsection{Definition}
 \label{sec:imperative_form_definition}
 Here we define \textit{imperative form} (`IF') concretely, and explain how its definition corresponds with the intuition behind it. Firstly, an IF contains a structure which corresponds to a \textit{symbol table}; this does the work of assigning symbolic \textit{data types} to ports and memory cells. Ports must also be annotated with an explicit \textit{orientation} (ie.\ input or output). Other symbols are also represented here, for example, the names and the argument types for any named functions.
@@ -120,18 +111,6 @@ Our definition represents an elaboration of the underlying concept. $P$ and $I$ 
 	\item Accesses of any values must not mutate or consume the original, eg.\ using a value as an argument in $fill_F$.
 \end{enumerate}
 
-%This definition represents an elaboration of the underlying concept. Rather than a single list over actions constrained by the properties they must satisfy, we make explicit three \textit{classes} of actions such the properties are structurally guaranteed for any well-formed IF. Despite them comprising transient actions evaluated in the order of their appearance, $P$ is distinguished from $I$ as it allows a terse, ergonomic means of both (1) making explicit which values are accessible
-%
-%
-%$P$ and $I$ both represents \textit{transient} actions prior to commitment; $P$ is distinguished, allowing us to simultaneously define which \textit{persistent values} (values from the global scope, ie.\ not temporary values) are accessible and known to be 
-%
-%Conceptually, this definition represents a minor elaboration on the underlying concept. Deviations are motivated primarily by convenience. P
-%\begin{enumerate}
-%	\item The final, committing action is provided its own name, $M$, to disti
-%\end{enumerate}
-%
-%Conceptually, this definition adheres closely to the intuitive description of imperative form. To reflect the special treatment of the list of actions, we here explicitly distinguish it into $M$. $P$ and $I$ are distinguished to make clear the set of values that the imperative rule must access from the global scope; implicitly, all values in $I$ must be temporary and thus are not permitted to overwrite 
-
 As an example to demonstrate this representation, the RBA rule in the previous section with data constraint $X=f(X)$
 and synchronization constraint $\{X\}$ can be represented in the imperative-form rule with:
 
@@ -149,18 +128,6 @@ and synchronization constraint $\{X\}$ can be represented in the imperative-form
 \section{Translation Pipeline}
 In this section be describe how Reo's internal representation (`IR') of protocol specifications is translated to a Rust protocol object. As per the design in Section~\ref{sec:two_phase}, this process involves generation steps partitioned over two distinct phases with imperative form (`IF') in-between. Here, we describe this process beginning to end. Throughout this section, we refer to the generation process in terms of its three distinct subtasks $\{T_{seq}, T_{type}, T_{run}\}$, defined in Section~\ref{sec:sub_tasks}.
 
-%\subsection{Temporary Simplifications}
-%IF includes explicit annotations for the data types of ports, memory cells and temporary variables, representing the completion of $T_{type}$. Our definition thus-far reflects our conceptual design, where the translation to IF is entirely target-language agnostic. In our current implementation, this is not strictly true; our translation to IF is not entirely free of Rust for one purpose only: currently, Rust is the only target language making use of IF. For the purpose of minimizing the (uninteresting) implementation work for the project, the Reo compiler emits rust source directly, which is a thin, Rust-friendly wrapper over a data structure of a protocol specification in IF as one would expect. This simplification has three advantages:
-%
-%\begin{enumerate}
-%	\item We trivialize the burden on the second translation phase by representing IF in a form the Rust compiler understands inherently: a type in the Rust language. 
-%	\item We can rely on Rust's \textit{generic types} to generate Rust dependency which is able to delay the resolution of its symbolic data-types (part of $T_{run}$) to the last possible moment, relying on a representation that is both idiomatic for the language, and trivial to implement: we represent them as Rust \textit{generic types}.
-%	\item We do not deviate from the current idiom in the Reo compiler, whereby a target language generates a dependency for the source language directly.
-%\end{enumerate}
-%
-%Effectively, our current implementation of Reo's Rust backend emits a Rust-specific dependency which relies almost entirely on its IF intermediate form in the manner described in Section~\ref{
-%}
-
 \subsection{Reo Compiler Backend}
 \label{sec:translation_phase_1}
 We extend the Reo compiler with a backend for translating IR to Rust source on which the end user may depend. In this phase, the work is primarily concerned with restructuring IR to IF, involving two of the three sub-tasks for generating to a particular imperative language target, namely~$T_{seq}$ and~$T_{type}$. 
@@ -173,26 +140,6 @@ To begin, we describe the na\"ive approach to translate IR to IF a rule at a tim
 Our translation procedure initializes all three fields $\{P, I, M\}$ of an imperative rule as initially-empty, and populates them incrementally by recursively traversing the IR rule's assignments. Each such assignment is ultimately represented in~$M$, where \textit{terms} are rather represented by identifiers. For some terms the mapping to identifier is trivial. For example, the value put by a port can use the identifier of the port itself. For others, it may be necessary to introduce \textit{fresh} identifiers, representing \textit{temporary variables} to be created. In either case, the \textit{term} is traversed recursively to (1) collect these identifiers, and to (2) populate the premise~$P$ such that the rule is fired given access to all of the relevant memory cells and ports.
 
 $I$ is populated last by three kinds of actions. Firstly, the exceptional cases for which memory variable~$q$ will be both read and written to are treated. If necessary, a fresh temporary variable is introduced by appending an instruction $swap(q, q_{temp})$ where $q_{temp}$ is some fresh variable; $q$'s previous and next values may be read and written unambiguously, distinguished by identifiers $q_{temp}$ and $q$ respectively. Second, $I$ is appended with $fill_P$ or $fill_F$ instructions to create every other temporary variable in a manner befitting the \textit{term} that represented them in the IR's assignments, ie.\ the result of invoking a function with port values as arguments. Finally, $I$~ends with a single $check$ to evaluate the rule's guard, initiating an abort if it is evaluates to \textit{false}.
-
-%The procedure as it was described thus-far may be 
-
-%has a defined creation instruction
-%created in a manner befitting their associated \textit{term};
-%
-%
-%%Ultimately each assignment is represented in~$M$, mapping the identifier of a value to the identifier of the \textit{destination}. For the majority of cases, these terms are trivial, representing the identifier of one of the protocol's memory cells or ports. In all cases, the backend's task is to 
-%%
-%%
-%%
-%%
-%%
-%%For each assigned term, the backend computes the \textit{identifier} which will contain the associated value once the rule \textit{commits}. Trivial terms are \textit{primitives}, corresponding directly to memory cells or ports. For these cases, the identifier of such is used directly, resulting only in an update to~$P$ to
-%%
-%%The term at each level is understood as some \textit{value}. The simplest terms are primitive (ie.\ the value \textit{put} by a port or the contents of a filled memory cell), and correspond with values that can be included in~$P$ as part of the premise. All other terms represent temporary values, which are associated with fresh \textit{identifiers}. 
-%%Primitives are the vast majority in practice, and are simply associated with the identifiers of their port or memory cell. All others are assigned fresh \textit{temporary variable} identifiers, their order in the collection reflects the order in which they were encountered. 
-%
-%The most na\"ive means of translating IR to IF is achieved by inserting instructions into~$I$, creating all temporary variables, careful to order these instructions such that their corresponding terms always involve created values, ie.\ leaf terms occur above their roots in~$I$. The final instruction is a single monolithic \textit{check} instruction, which triggers rollback at the last possible moment, safe in the knowledge that any values accessed during evaluation already have been created. Finally,~$M$ is populated with mappings of movements; every identified value is included, with a \textit{destination} for every port or memory cell in whose assignment-term the value occurred as mapped the root term. Any putter-ports in the synchronization constraint that never occur in terms are provided with trivial mappings in $M$ to ensure their values are acquired and discarded correctly.
-%A final elaboration is necessary for every memory cell that is both read and written to. This occurs whenever it occurs both as a \textit{key} in the assignment map (it is assigned to, ie. written) and as a subterm of some value (ie.\ its value is accessed directly or indirectly in an instruction, eg.\ it occurs as an argument to a function call, computing a temporary value). For each such memory cell~$q$, $I$ is prefixed with a $swap(q, old_q)$ instruction, where $old_q$ is fresh, initially empty temporary variable. For all instructions to follow, and in~$M$, $q$~acts as a getter of the memory cells written value, while $old_q$ acts as a putter corresponding with a value moved to some nonempty set of destinations.
 
 As it was described thus-far, our procedure is able to correctly render any IR rule in IF with the necessary properties. For the sake of minimization or performance at runtime, at least three optimization opportunities may elaborate on this procedure, producing semantically-equivalent results.
 
@@ -215,32 +162,7 @@ Our backend performs task $T_{type}$ to generate the IF such that the identifier
 
 Our backend performs this work in tandem with the work of $T_{seq}$ described in the previous section. Initially, every identifier is assigned s fresh symbolic type with no constraints, representing a data-type unrelated to any other, and having no need of any defined operations. In traversing the IR rules, \textit{constraints} are collected, associating them to the relevant identifiers. Incrementally, \textit{type constraints} are collected, accumulating requirements for the properties of types. For example, the type associated with a value is checked for equality, irrevocably acquiring the \code{eq} constraint, marking the need for it to define an operation to check value-equality. In some cases, a relationship between identifiers causes their types to be \textit{unified}. For example, a data-movement from putter~$P$ to getter~$G$ unifies their types, resulting a new type with the union of their constraints. If the requirements on types are \textit{contradictory}, an error is emitted by the Reo compiler. For example, it is an error to provide types $A$ and $B$ with different explicit data type annotations, yet have them exchange data.
 
-Ultimately, an IF constructed with a global \textit{symbol table}, defining the mapping from identifiers to types such that our requirements are satisfied.
-
-%IF expects an explicit type-annotation for the \textit{identifiers} of every port, memory cell and temporary value. As IR cannot be relied upon to create explicit annotations, our backend is reponsible for $T_{type}$, the resolution of all symbolic types for identifiers. As IF is still a language-agnostic specification, these types serve little purpose other than to act as \textit{equivalence classes} and discover which properties these symbolic types much satisfy such that the target language can ensure all the 
-%
-%Previously referred to as $T_{type}$, the backend must extract data-type information about its ports and memory cells from the compiler's internal representation such that the generated Rust is valid. Our approach is to begin by assuming that every port, memory cell and temporary variable has its own unrelated type. The types are then \textit{constrained} as a result of discovering the ways in which they are related from the protocol definition. For example, the presence of a term \code{Eq(A,B)} `collapses' the types of~$A$ and~$B$ into one equivalence class. Still, at this level, types are purely symbolic. 
-%
-%These symbolic types exist only in the first phase of the code generator. They are not only resolved prior to phase two, but they are not present in that phase at all. Our imperative form does not deal with the complexity of symbolic (ie.\ generic or parametric) types. Instead, the Reo compiler relies on the Rust idiom of relying on \textit{dispatch} to resolve concrete types at the last possible moment: at the call site. To achieve this result, Reo generates the \code{ProtoDef} object wrapped in a \textit{wrapper function}, whose role is primarily to expose generic type parameters for instantiation to the caller, and construct a \code{ProtoDef} instance within the body, to be invoked with concrete types. Listing~\ref{listing:type_resolve} gives an example of how this generic function appears to the end user for some trivial protocol. Observe how \code{protocol\_1} relies on generics to let the caller, \code{main\_1} which type to select for~\code{T}. The \code{TypeInfo} structure represents a port's data type as data. The details of this type are provided in Section~\ref{sec:type_reflection}.
-%
-%
-%\begin{listing}[ht]
-%	\centering
-%	\inputminted[]{rust}{type_resolve.rs}
-%	\caption[Concrete vs.\ generic protocol-building functions.]{Comparison between concrete and generic function definitions for building \code{ProtoDef} structures. \code{new\_proto\_a} uses the concrete \code{String} type, and will be compiled to a single function as expected. Reo uses the approach of \code{new\_proto\_b}, which determines the choice of the generic type on demand at the \textit{call site}.}
-%	\label{listing:type_resolve}
-%\end{listing}
-%
-%Unlike Java, Rust makes very few promises about the properties of some generic type. It cannot be certain that instances of some generic type~\code{T} will have a defined operation for checking equality, or for safe \textit{value replication}. To facilitate \textit{useful} polymorphism, Rust relies on \textit{type constraints} to act as a contract between caller and callee: the caller will ensure that only types which satisfy the bound may be selected for the type parameter, and the callee is able to interact with its generic arguments in accordance with \textit{behavior} the bounds guarantee the type will define. This approach may be familiar to programmers of Java or C, where this concept manifests as interfaces and declarations (usually in header files) respectively. 
-%
-%The Reo backend cannot guarantee the generated Rust code is sound unless it is careful to add the necessary type bounds to its generic arguments. The internal representation is inspected for cases which will necessitate the use of specialized operations (such as replication) and will annotate its generic types with \textit{trait bounds}. Ultimately, the resulting coalesced, bounded type parameters are reflected in the generated code as part of the function declaration. The second phase of the code generator can rest assured that for every specialized operation inserted, Reo will have already anticipated the need to guarantee the bound is satisfied. Listing~\ref{listing:type_resolve2} gives an example of a generated trait bound for the case where two memory cells are related by being the same, and requiring the definition of an equality operation.
-%
-%\begin{listing}[ht]
-%	\centering
-%	\inputminted[]{rust}{type_resolve2.rs}
-%	\caption[Reo-generated trait bounds for generic types.]{Reo-generated \code{ProtoDef} building functions with a generic type~\code{T}. Reo inserts trait bounds to ensure the type chosen for~\code{T} has all the needed behavior. In this case, \code{T:~Eq}, ensuring that instances can be checked for equality, as necessitated by the instruction on line~9. Line~16 generates a compile-time error, as~\code{Foo} does not meet the requirements.}
-%	\label{listing:type_resolve2}
-%\end{listing}
+Ultimately, the constructed IF associates a symbolic type with every mapping in its symbol table.
 
 \subsubsection{Delegated to the Rust Compiler}
 Section~\ref{sec:temporary_simplifications} explains that our current implementation of the Rust backend for the Reo compiler makes the temporary simplification of emitting Rust source code directly. This approach adheres with the Reo compiler's idiom of code generation per target language, but also it simplifies our work overall as we are able to effectively \textit{delegate} some of the translation work to the Rust compiler itself. Both of these simplifications are inspired by Reo's Java code generator, whose direct-to-Java code generator delegates these tasks to the Java compiler in the same manner:
@@ -314,4 +236,3 @@ In native Rust, the usual variable scoping rules apply to ensure that a symbolic
 \end{listing}
 
 By restricting our API such that all executable protocol objects are \textit{only} created by \code{build}, our runtime interpreter is able to rely on the properties we guarantee and avoid checking them itself. In this way, checking for soundness is also an optimization.
-
