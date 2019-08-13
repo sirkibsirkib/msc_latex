@@ -1,6 +1,6 @@
 \chapter{Protocol Runtime}
 \label{sec:protocol_runtime}
-In this section we explore the Rust implementation of Reo-generated protocol objects. Rather that generating the needed structures and behaviour from scratch each time, the Rust back-end follows the precedent of the well-established Java back-end and relies on a single, re-usable dependency for the work common to all protocols. Here, we explore the implementation of this \textbf{Reo-rs} library, picking up where we left off from the generation step in Chapter~\ref{sec:imperative_form} above.
+In this section we explore the Rust implementation of Reo-generated protocol objects. Rather than generating the needed structures and behaviour from scratch each time, the Rust back-end follows the precedent of the well-established Java back-end and relies on a single, re-usable dependency for the work common to all protocols. Here, we explore the implementation of this \textbf{Reo-rs} library, picking up where we left off from the generation step in Chapter~\ref{sec:imperative_form} above.
 
 \section{Examining the Java Implementation}
 \label{sec:java_examined}
@@ -94,7 +94,7 @@ First, we identify a number of functional requirements. These determine the func
 
 Furthermore, we identify \textit{guidelines} for softer, qualitative properties of the implementation of Reo-rs. These primarily address matters of feature priority, and provide a basis for making the assumptions necessary for meaningful optimization. The Java implementation is the closest parallel to Reo-rs for performance, and is far too different to form the basis of any thorough quantitative testing. Hence, these guidelines are not formulated such that they can be absolutely satisfied. Instead, performance benchmarking in Chapter~\ref{sec:benchmarking} \textit{motivates} the extent to which the guidelines are followed by Reo-rs.
 \begin{enumerate}
-	\item[$\boldsymbol{G_{data}}$] Allow the transmission of large data types without requiring the user to move the from the stack to the heap. Minimize the number of times data must be \textit{moved} in memory such that data transmission remains performant for types with large representations.	
+	\item[$\boldsymbol{G_{data}}$] Allow the transmission of large data types without requiring the user to move them from the stack to the heap. Minimize the number of times data must be \textit{moved} in memory such that data transmission remains performant for types with large representations.	
 	
 	\item[$\boldsymbol{G_{fast}}$] Minimize the overhead of \textit{control operations} for the protocol object to route payloads and perform bookkeeping. In particular, minimize the cost of \textit{evaluating} the rules before one is selected for firing.
 	
@@ -176,7 +176,7 @@ One pivotal decision of our final design is to attempt to alleviate this problem
 \subsubsection{Delegating the Task of Data Exchange}
 Owing to our focus on values at the systems level, we do not have the simplifying luxury of the Java backend to presume that moving data is cheap. In Rust, as in C and C++, values are not represented by indirect references by default; often, their shallowest representations are all there is to them. To satisfy $\boldsymbol{G_{data}}$, the Java backend's (admittedly intuitive) representation of ports as data pigeonholes is wasteful. For many realistic Reo protocols, data often moves \textit{through} protocols synchronously, moving from \code{Putter} to \code{Getter} without any storage in memory cells in-between. 
 
-Our implementation introduces a new idea in an attempt to capitalize on this observation: getters fetch their data directly from the \textit{source}. In this approach, the coordinator does necessarily handle data itself. Rather, it decides which rule to fire and \textit{delegates} the task of moving the data to the getters themselves. In addition to skipping a redundant `data hop' from putter to coordinator, this also facilitates the dissemination of a putter's datum to all its getters \textit{in parallel}. This change requires extra messaging form the coordinator, as getters are given more responsibility. Where before a signal from coordinator to getter sufficed (`Your datum is ready!'), coordinators must now communicate the location of the getters' source (`Your datum can be found at $P$!').
+Our implementation introduces a new idea in an attempt to capitalize on this observation: getters fetch their data directly from the \textit{source}. In this approach, the coordinator does not necessarily handle data itself. Rather, it decides which rule to fire and \textit{delegates} the task of moving the data to the getters themselves. In addition to skipping a redundant `data hop' from putter to coordinator, this also facilitates the dissemination of a putter's datum to all its getters \textit{in parallel}. This change requires extra messaging form the coordinator, as getters are given more responsibility. Where before a signal from coordinator to getter sufficed (`Your datum is ready!'), coordinators must now communicate the location of the getters' source (`Your datum can be found at $P$!').
 
 
 \subsection{Architecture}
