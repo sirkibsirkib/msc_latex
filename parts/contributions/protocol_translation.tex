@@ -190,30 +190,9 @@ The second task is most interesting, as care must be taken to represent our gene
 \begin{listing}[ht]
 	\centering
 	\inputminted[]{rust}{generic_resolve.rs}
-	\caption[Simple Reo compiler Rust output.]{Example of a Reo-generated Rust output for a simple connector which replicates values of port $P$ to ports $\{C0, C1\}$. The user is able to construct \code{Proto}, an executable protocol object by invoking function~\code{build\_protocol\_1}. The caller determines the concrete choice of the generic type~\code{T}, but the Rust compiler will enforce that this choice is constrained such that it implements~\code{Clone} (the type's values can be replicated). The contents of the function consist predominantly of the construction of an instance of \code{ProtoDef}. In combination with \code{MemInitial}, these types represent the Rust-embedding of the protocol's imperative form specification.}
+	\caption[Simple Reo compiler Rust output.]{Example of a Reo-generated Rust output for a simple connector which replicates values of port $P$ to ports $\{C0, C1\}$. The user is able to construct \code{ProtoHandle}, a handle to an executable protocol object by invoking function~\code{build\_protocol\_1}. The caller determines the concrete choice of the generic type~\code{T}, but the Rust compiler will enforce that this choice is constrained such that it implements~\code{Clone} (the type's values can be replicated). The contents of the function consist predominantly of the construction of an instance of \code{ProtoDef}. In combination with \code{MemInitial}, these types represent the Rust-embedding of the protocol's imperative form specification.}
 	\label{listing:generic_resolve}
 \end{listing}
-
-%Consequently, there are two minor discrepancies between the concept and its implementation in practice:
-%\begin{enumerate}
-%	\item The initial
-%\end{enumerate}
-%
-% 
-%IF is a specification focused on the \textit{behavior} of a connector at runtime. Notably, it omits 
-
-%\subsubsection{Initial Protocol State}
-%The initial state of a protocol object is unusual in that it is included in the textual Reo protocol definition, but omitted from the \code{ProtoDef}. This design choice reflects how a protocol's initial state is unassuming at first glance, but is significantly different from the rest of the protocols definition: it is the only part of specification that cannot generally be replicated. Rules and name definitions describe \textit{behavior}, and do not involve any elements of the port's data domain directly. By contrast, a protocol's initial state does not \textit{describe} data, it \textit{is} data. By extracting this facet of the specification, \code{ProtoDef} becomes pure in its role as a \textit{blueprint} for a protocol's behavior. 
-%
-%Nevertheless, textual Reo is able to specify the initial states of memory cells. To support this functionality, the Reo compiler itself generates code which \textit{builds and injects} the initial values for any initially-filled cells in a controlled environment. To mirror the textual descriptions that define the initial values, these memory types acquire a final trait bound such that their initial values can be constructed per protocol object instantiation \textit{within} the confines of the function that the Reo compiler generates. Listing~\ref{listing:mem_init} exemplifies a trivial protocol where~$A$ is a memory cell defined as being initialized by some value represented by the string `\texttt{hello}'. The generated code inserts a trait dependency, ensuring that the type parameter~\code{T} defines this operation. Observe how now the return result is no longer~\code{ProtoDef}, but rather~\code{ProtoHandle}. While the former represents a re-usable \textit{blueprint} for instantiating a~\code{ProtoHandle}, the latter represents an instantiated protocol, initialized and ready to run; the only user-facing means of generating a new object of the same protocol is to again invoke~\code{protocol}.
-%
-%\begin{listing}[ht]
-%	\centering
-%	\inputminted[]{rust}{mem_init.rs}
-%	\caption[Reo-generated builder function, returning a protocol instance.]{\code{new\_protocol} instantiates a runnable protocol object by internally building a \code{ProtoDef} description, and then immediately instantiating it with a \code{MemInitial}, whose contents are constructed from parsed strings. In this manner, Reo can control the initialization of protocol instances for any suitable type~\code{T}. Note that \code{\&str} is the immutable reference type of a sized string slice, while \code{String} is an owned, mutable character buffer. Both are common types from the Rust standard library.}
-%	\label{listing:mem_init}
-%\end{listing}
-
 
 \subsection{Rust Library}
 \label{sec:translation_phase_2}
@@ -221,7 +200,7 @@ Our work follows the precedent set by the Java code generator in relying on a li
 
 
 \subsubsection{Protocol Initialization}
-Listing~\ref{listing:generic_resolve} gives an example of Reo-generated Rust source. Previously, we explain how this representation delegates some of the work of $T_{run}$ to the Rust compiler itself. The remainder of $T_{run}$ is defined in the \code{build} procedure (visible is the listing on line-23) such that this work is performed at runtime whenever a protocol is \textit{instantiated}. As can be seen in the \textit{return value} of the function in the listing, the end result is the construction of \code{Proto}, the \textit{executable} protocol object, whose properties are explored in Chapter~\ref{sec:protocol_runtime}.
+Listing~\ref{listing:generic_resolve} gives an example of Reo-generated Rust source. Previously, we explain how this representation delegates some of the work of $T_{run}$ to the Rust compiler itself. The remainder of $T_{run}$ is defined in the \code{build} procedure (visible is the listing on line-23) such that this work is performed at runtime whenever a protocol is \textit{instantiated}. As can be seen in the \textit{return value} of the function in the listing, the end result is the construction of \code{ProtoHandle}, a handle to an \textit{executable} protocol object, whose properties are explored in Chapter~\ref{sec:protocol_runtime}.
 
 At this level, the specification used to \code{build} the \code{Proto} is split into two distinct types: \code{ProtoDef} and \code{MemInitial}. The former describes its \textit{behavior}, corresponding most closely with the conceptual design of IF. The latter isolates a simple structure which contains pre-allocated values for the finished \textit{protocol object}; in effect, it provides the initial values of memory cells. These structures are distinguished for only one reason: \code{ProtoDef} contains no \textit{values}, such that it can be accessed by \code{build} in a read-only fashion. Although it is not taken advantage of by the Reo-generated program, one is able to define a protocol's behavior \textit{once} to be used for the construction of any number of \code{Proto} instances.
 

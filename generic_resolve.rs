@@ -1,4 +1,4 @@
-fn build_protocol_1<T: Clone>() -> Proto {
+pub fn build_protocol_1<T: Clone>() -> ProtoHandle {
     ProtoDef {
         let type_info = TypeInfo::of::<T>();
         name_defs: hashmap! {
