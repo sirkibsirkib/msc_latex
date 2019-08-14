@@ -1,12 +1,47 @@
 \chapter{Protocol Translation}
 \label{sec:imperative_form}
-In this chapter, we describe the process of translating the Reo compiler's internal representation of a protocol specification into an executable \textit{protocol object} in the Rust language.
 
-\section{Two-Phase Code Generation}
+The task of the Reo compiler is to translate a Reo protocol specification into the target language. The resulting code must interface with other components written in the language such that, at runtime, the resulting system behaves as specified. In this chapter, we explain how we extend the Reo compiler to support the Rust language target.
+
+Section~\ref{sec:two_phase} approaches the task of translating from Reo to Rst
+
+examines the nature of this task by breaking it into three subtasks, and motivating our choice of performing them in two distinct phases: the former performed by the Reo compiler, and the latter performed by the Rust compiler. Section~\ref{sec:imperative_form_sec} introduces \textit{imperative form} as a novel intermediate representation of protocols between the two phases. Finally, Section~\ref{sec:translation_pipeline} goes into detail, explaining our implementations of both translation phases, ultimately producing Rust source code.
+
+%\hl{
+%	The task of the Reo compiler is to translate a Reo protocol specification into the target language. The resulting code must interface with other components written in the language such that, at runtime, the resulting system behaves as specified. Rust is an example of an imperative language, unable to represent port interactions at the same high level. Our generated code must implement the specification in terms of imperative actions
+%	
+%	Imperative languages must instead 
+%	between a set of \textit{components} written in the target language. When connected together in the manner corresponding to the s
+%	
+%	the task is to generate a rust protocol object from the reo spec such that it can be used in a rust program.
+%	3. naive extreme: 100 percent reo is infeasible: must do signficiant work emulating rust. and they both become tightly coupled
+%	4. java solution is to move common object defs to a library. this is fine but its not enough! (WHY)
+%	5. 
+%	4. java recognized this problem and has the solution of using a lib for protocol and port. still, if we attempted to emulate this choice of granulairty, reo would still do the majority of the heavy lifting
+%	5. we have a structured approach. isolate the tasks involved in the transformation. we identify that two are language-independent if beyond the target being imperative. 
+%	6. we make this distinction concrete in considering it a two-step process with imperative form in the middle: representing the specification of an imperative protocol.
+%	
+%	3. follow the precedent of moving as much as possible to a library. minimizes repetition and avoids reo compiler from being too coupled on the implementation. on the other hand, moving things into the library prevent them from being entirely statically generated; forces us to express it in terms that can be computed at runtime. we strike a balance by performing all the high level transformations at runtime 
+%}
+
+%In this chapter, we describe the process of translating the Reo compiler's internal representation of a protocol specification into an executable \textit{protocol object} in the Rust language.
+
+\section{Structuring the Translation Process}
 \label{sec:two_phase}
 In this section, we explain and motivate our approach of segmenting the code generation process into two distinct phases. Throughout, we refer to the precedent set by the existing Reo compiler backend for generating code in the Java language, as it has seen the language most similar to Rust which has seen significant development.   
 
-\subsection{Generation Subtasks}
+
+\subsection{Translation Decomposed}
+
+\begin{table}[]
+	\begin{tabular}{l|p{6cm}p{6cm}}
+		& Action & Data Type \\ \hline
+		Abstract & $T_{AA}$: From each abstract interaction, a sequence of abstract imperative actions are laid out. & $T_{AT}$: Ports are mapped to symbolic data types characterized by constraints on their properties. \\
+		Concrete & $T_{CA}$: Abstract actions are reified into concrete, executable Rust operations. & $T_{CT}$: Each symbolic data type is made concrete, selecting a particular Rust type.
+	\end{tabular}
+\end{table}
+
+\subsection{Three Translation Subtasks}
 \label{sec:sub_tasks}
 Reo specifications represent connectors declaratively as relations between ports. They are thus well suited to reasoning about the protocol's properties. In contrast, our target imperative languages such as Java and Rust represent computation such that it corresponds more closely to machine instructions; they are imperative, laying out sequences of actions which together emerge as interaction at runtime. Where interactions in the former can be oriented around the synchronous observations of port values, interactions of the latter must be expressed as sequences of actions, laid out over time. Implementing algorithms for translating between these forms must take care that the translation procedure between these forms preserves the semantics as intended; choosing the incorrect ordering can change the nature of the emergent interaction in unexpected ways. For example, reading memory cell \textit{before} writing it corresponds to a different interaction than reading it \textit{after} writing it. 
 
@@ -22,7 +57,12 @@ In summary, we identify and name three subtasks of generating target language pr
 \end{itemize}
 
 
-\subsection{Decoupling the Reo Compiler from Rust}
+\subsection{Two Translation Phases}
+\hl{
+	code generation is weird. we are doing meta programming. we have multiple languages, multiple compilers. if we have work to do, asking "who and where" becomes a nontrivial question. 
+}
+
+
 \label{sec:decoupling_reo_rust}
 The Reo compiler has an existing backend for generating Java code. It works by generating Java according to the structure of a \textit{template generator}. In this manner, it can be thought of as performing all code-generation subtasks at the same time directly from the compiler's intermediate representation. However, the extent to which the Reo compiler is \textit{coupled} to the Java language is reduced through the reliance on a Java library for the granular implementations of structures that are common to all protocol objects; rather than generating these classes each time, the Reo compiler simply generates a dependency. For example, the library defines a \code{Component} interface, for which the code generator produces a protocol-specific implementor class. Consequently, a significant part of the $T_{run}$ subtask (subtasks are defined in Section~\ref{sec:sub_tasks}) is delegated to this library.
 
@@ -53,11 +93,11 @@ The translation from Reo's internal representation to imperative form is \textit
 
 \subsubsection{Rules as Transactions}
 
-The Reo compiler's internal representation partitions the work of a rule into its \textit{guard} and \textit{assignments}. This is already a step in the direction of imperative computation, observing that some work (the guard) must be performed \textit{prior} to deciding whether the rule \textit{fires}, in which case the assignment follows. As the protocol does not define the moments when it will evaluate the guard, it is necessary that this evaluation has no side effects ie.\ observable effects to the outside world. In essence, Reo's internal representation formulates a rule as a two-element sequence where the first (the guard) is \textit{transient}, and may end the rule's execution early, and the second (the assignment) exhibits \textit{observable effects}, namely, the results of the rules \textit{firing}.
+The Reo compiler's internal representation partitions the work of a rule into its \textit{guard} and \textit{assignments}. This is already a step in the direction of imperative computation, observing that some work (the guard) must be performed \textit{prior} to deciding whether the rule \textit{fires}, in which case the assignment follows. As the protocol does not define the moments when it will evaluate the guard, it is necessary that this evaluation has no side effects i.e.,\ observable effects to the outside world. In essence, Reo's internal representation formulates a rule as a two-element sequence where the first (the guard) is \textit{transient}, and may end the rule's execution early, and the second (the assignment) exhibits \textit{observable effects}, namely, the results of the rules \textit{firing}.
 
 Imperative form adopts this notion of ordering, but generalizes it to a sequence of arbitrary length. For our purposes, it suffices to continue requiring a single \textit{last} action to represent the assignment. For all prior actions:
 \begin{enumerate}
-	\item they have a defined means of being \textit{undone}, ie.\ the action must be reversible. It follows that each action cannot have any immediately-observable effects,
+	\item they have a defined means of being \textit{undone}, i.e.,\ the action must be reversible. It follows that each action cannot have any immediately-observable effects,
 	\item they may conditionally trigger an \textit{abort} event, which occurs after their evaluation completes.
 \end{enumerate}
 
@@ -74,18 +114,18 @@ Connectors become more complex as they rely on the creation of temporary variabl
 \subsubsection{Valid Value Access}
 Imperative languages often prohibit using variables \textit{prior} to definition. Usually, the only case in which a variables access becomes invalid if it goes out of scope. Rust and affine languages generalize this notion, working to keep track of the moment when a value is \textit{consumed}, after which its access is invalid. 
 
-For our purposes, it is useful to allow values to \textit{become invalid}. In the context of imperative form, this allows any actions to \textit{empty} memory cells, as long as they still follow the rule (ie.\ they are able to \textit{undo} the emptying). The motivation behind this extension is Reo's ability to express the access of the value of a memory cell both before and after it is overwritten. We are able to represent these kinds of interactions with sequential actions if we are able to \textit{empty} a filled memory cell's contents elsewhere. 
+For our purposes, it is useful to allow values to \textit{become invalid}. In the context of imperative form, this allows any actions to \textit{empty} memory cells, as long as they still follow the rule (i.e.,\ they are able to \textit{undo} the emptying). The motivation behind this extension is Reo's ability to express the access of the value of a memory cell both before and after it is overwritten. We are able to represent these kinds of interactions with sequential actions if we are able to \textit{empty} a filled memory cell's contents elsewhere. 
 
 Ultimately, we elaborate our notion of value validity to correspond more closely with the actions an affine-typed compiler would perform: in reading over actions from top to bottom, \textit{inaccessible} identifiers become \textit{accessible} when their values are created, and accessible identifiers become inaccessible if their values are explicitly emptied. A variable access is valid only if it was accessible at the end of the previous action. This formulation makes clear the need of some means of deciding which values are \textit{initially accessible}. Our solution is made apparent in the definition of IF to follow.
 
 \subsection{Definition}
 \label{sec:imperative_form_definition}
-Here we define \textit{imperative form} (`IF') concretely, and explain how its definition corresponds with the intuition behind it. Firstly, an IF contains a structure which corresponds to a \textit{symbol table}; this does the work of assigning symbolic \textit{data types} to ports and memory cells. Ports must also be annotated with an explicit \textit{orientation} (ie.\ input or output). Other symbols are also represented here, for example, the names and the argument types for any named functions.
+Here we define \textit{imperative form} (`IF') concretely, and explain how its definition corresponds with the intuition behind it. Firstly, an IF contains a structure which corresponds to a \textit{symbol table}; this does the work of assigning symbolic \textit{data types} to ports and memory cells. Ports must also be annotated with an explicit \textit{orientation} (i.e.,\ input or output). Other symbols are also represented here, for example, the names and the argument types for any named functions.
 
 More interesting are the \textit{imperative rules} listed for an IF. Each rule is given by $(P,I,M)$ where:
 \begin{enumerate}
 	\item \textbf{Premise $P$}\\
-	A tuple of three \textit{identifier} sets $(P_R, P_F, P_E)$. $P_R$~is the \textit{synchronization constraint}, ie.\ the set of ports identifiers whose values must be `ready'. $P_F$ and $P_E$ are the sets of \textit{memory variables} which must be known to be full and empty respectively, such that it is known whether they can be read or written from. The rule can certainly not consider firing unless all ports are ready and all memory cells are in the specified states.
+	A tuple of three \textit{identifier} sets $(P_R, P_F, P_E)$. $P_R$~is the \textit{synchronization constraint}, i.e.,\ the set of ports identifiers whose values must be `ready'. $P_F$ and $P_E$ are the sets of \textit{memory variables} which must be known to be full and empty respectively, such that it is known whether they can be read or written from. The rule can certainly not consider firing unless all ports are ready and all memory cells are in the specified states.
 	
 	\item \textbf{Instructions $I$}\\
 	A list of reversible \textit{instructions} which are performed in sequence. These instructions have no immediately observable effects, such that they can be reverted in the event of an \textit{abort}. Concretely, each instruction is one of:
@@ -106,12 +146,12 @@ More interesting are the \textit{imperative rules} listed for an IF. Each rule i
 
 Our definition represents an elaboration of the underlying concept. $P$ and $I$ contain only \textit{transient} actions, which have no immediately-observable effects, and are able to handle the rule aborting such that their actions are \textit{undone}. $P$~is distinguished as it serves a dual purpose: (1) it establishes which values are initially \textit{accessible}, and (2) it tersely expresses an immediate conditional abort in the event the ports and memory cells are not in the states defined. $M$~is the final action, performed if and only if the rule commits. It defines what happens to all of the \textit{accessible} values still `in scope' at the end of the rule's execution. $I$~contains everything else, representing an arbitrary sequence of transient computation. These actions are subject to handling the rule being aborted, and thus our definition includes only reversible actions. Data is prohibited from being irrecoverably lost during $I$ actions, as otherwise the actions could not be \textit{undone} in the event of the rule aborting. This has three notable consequences:
 \begin{enumerate}
-	\item $fill_F$ can only rely on \textit{pure} functions, ie.\ their execution in and of itself must not be observable to the outside world.
-	\item $fill_F$ and $fill_P$ can only write to \textit{inaccessible} values, ie.\ they cannot overwrite accessible values.
-	\item Accesses of any values must not mutate or consume the original, eg.\ using a value as an argument in $fill_F$.
+	\item $fill_F$ can only rely on \textit{pure} functions, i.e.,\ their execution in and of itself must not be observable to the outside world.
+	\item $fill_F$ and $fill_P$ can only write to \textit{inaccessible} values, i.e.,\ they cannot overwrite accessible values.
+	\item Accesses of any values must not mutate or consume the original, e.g.,\ using a value as an argument in $fill_F$.
 \end{enumerate}
 
-Conceptually, the final, committing action of the rule is able to perform any computation at all (provided it does not break any data-access rules) safe in the knowledge that its actions are allowed to be \textit{irreversible}. However, our definition constrains what $M$ can express significantly. $M$~only defines the fate of the \textit{accessible} values that remain after all other actions are performed. Essentially, $M$ maps each value to the set of locations to which it is moved. This representation makes it trivial to distinguish the cases where values are discarded (0 destinations), moved linearly (1 destination) or replicated (multiple destinations). This design is convenient for languages that require their values to be more explicitly managed. For example, languages with \textit{affine types} (eg.\ Rust) must simulate the replication of values by creating new affine resources from the original, and managing the replicas explicitly.  \textit{Relevant} data types (which must be used \textit{at least once}~\cite{walker2005substructural}) must handle empty destination sets by either emitting errors, or simulating destruction.\footnote{A relevant language may simulate the destruction of a value by moving it to some \code{Destroyed} destination with special semantics.} There are many other reasons a language may want to specialize the way its values are used. For example, an implementation in C++ may need to inject \code{free} calls to avoid leaking memory in cases where pointer-values are discarded.
+Conceptually, the final, committing action of the rule is able to perform any computation at all (provided it does not break any data-access rules) safe in the knowledge that its actions are allowed to be \textit{irreversible}. However, our definition constrains what $M$ can express significantly. $M$~only defines the fate of the \textit{accessible} values that remain after all other actions are performed. Essentially, $M$ maps each value to the set of locations to which it is moved. This representation makes it trivial to distinguish the cases where values are discarded (0 destinations), moved linearly (1 destination) or replicated (multiple destinations). This design is convenient for languages that require their values to be more explicitly managed. For example, languages with \textit{affine types} (e.g.,\ Rust) must simulate the replication of values by creating new affine resources from the original, and managing the replicas explicitly.  \textit{Relevant} data types (which must be used \textit{at least once}~\cite{walker2005substructural}) must handle empty destination sets by either emitting errors, or simulating destruction.\footnote{A relevant language may simulate the destruction of a value by moving it to some \code{Destroyed} destination with special semantics.} There are many other reasons a language may want to specialize the way its values are used. For example, an implementation in C++ may need to inject \code{free} calls to avoid leaking memory in cases where pointer-values are discarded.
 
 As an example to demonstrate intermediate representation, the RBA rule in the previous section with data constraint $X=f(X)$
 and synchronization constraint $\{X\}$ can be represented in the imperative rule with:
@@ -120,7 +160,7 @@ and synchronization constraint $\{X\}$ can be represented in the imperative rule
 \noindent{}
 \begin{tabular}{r|l}
 	\centering
-		&  value \\ \hline
+	&  value \\ \hline
 	premise	&  $(\{X\}, \enskip\{\}, \enskip\{f_X\})$ \\
 	instructions	& $[fill_F(f_X, f, [X]), \enskip{} check(X = f_X)]$ \\
 	movements	& $\{X \rightarrow{}\emptyset{}, \enskip f_X \rightarrow{}\emptyset{}\}$ 
@@ -128,6 +168,7 @@ and synchronization constraint $\{X\}$ can be represented in the imperative rule
 \vspace{1em}
 
 \section{Translation Pipeline}
+\label{sec:translation_pipeline}
 In this section be describe how Reo's internal representation (`IR') of protocol specifications is translated to a Rust protocol object. As per the design in Section~\ref{sec:two_phase}, this process involves generation steps partitioned over two distinct phases with imperative form (`IF') in between. Here, we describe this process beginning to end. Throughout this section, we refer to the generation process in terms of its three distinct subtasks $\{T_{seq}, T_{type}, T_{run}\}$, defined in Section~\ref{sec:sub_tasks}.
 
 \subsection{Reo Compiler Backend}
@@ -141,7 +182,7 @@ To begin, we describe the na\"ive approach to translate IR to IF a rule at a tim
 
 Our translation procedure initializes all three fields $\{P, I, M\}$ of an imperative rule as initially empty, and populates them incrementally by recursively traversing the IR rule's assignments. Each such assignment is ultimately represented in~$M$, where \textit{terms} are rather represented by identifiers. For some terms the mapping to identifier is trivial. For example, the value put by a port can use the identifier of the port itself. For others, it may be necessary to introduce \textit{fresh} identifiers, representing \textit{temporary variables} to be created. In either case, the \textit{term} is traversed recursively to (1) collect these identifiers, and to (2) populate the premise~$P$ such that the rule is fired given access to all of the relevant memory cells and ports.
 
-$I$ is populated last by three kinds of actions. Firstly, the exceptional cases for which memory variable~$q$ will be both read and written to are treated. If necessary, a fresh temporary variable is introduced by appending an instruction $swap(q, q_{temp})$ where $q_{temp}$ is some fresh variable; $q$'s previous and next values may be read and written unambiguously, distinguished by identifiers $q_{temp}$ and $q$ respectively. Second, $I$ is appended with $fill_P$ or $fill_F$ instructions to create every other temporary variable in a manner befitting the \textit{term} that represented them in the IR's assignments, ie.\ the result of invoking a function with port values as arguments. Finally, $I$~ends with a single $check$ to evaluate the rule's guard, initiating an abort if it is evaluates to \textit{false}.
+$I$ is populated last by three kinds of actions. Firstly, the exceptional cases for which memory variable~$q$ will be both read and written to are treated. If necessary, a fresh temporary variable is introduced by appending an instruction $swap(q, q_{temp})$ where $q_{temp}$ is some fresh variable; $q$'s previous and next values may be read and written unambiguously, distinguished by identifiers $q_{temp}$ and $q$ respectively. Second, $I$ is appended with $fill_P$ or $fill_F$ instructions to create every other temporary variable in a manner befitting the \textit{term} that represented them in the IR's assignments, i.e.,\ the result of invoking a function with port values as arguments. Finally, $I$~ends with a single $check$ to evaluate the rule's guard, initiating an abort if it is evaluates to \textit{false}.
 
 As it was described thus far, our procedure is able to correctly render any IR rule in IF with the necessary properties. For the sake of minimization or performance at runtime, at least three optimization opportunities may elaborate on this procedure, producing semantically-equivalent results.
 
@@ -158,7 +199,7 @@ As it was described thus far, our procedure is able to correctly render any IR r
 Our backend performs task $T_{type}$ to generate the IF such that the identifier of every port, memory cell, and temporary variable is assigned a symbolic type annotation, such that:
 \begin{enumerate}
 	\item the types of identifiers match if they exchange values or are checked for equivalence.
-	\item data types are boolean if they occur in a context in which only boolean types are permitted, ie.\ as the predicate of a formula.
+	\item data types are boolean if they occur in a context in which only boolean types are permitted, i.e.,\ as the predicate of a formula.
 	\item the type defines all the operations in which it may be involved at runtime. This includes operations for \textit{replication}, checking \textit{equality} of values and so on.
 \end{enumerate}
 
@@ -199,14 +240,14 @@ At this level, the specification used to \code{build} the \code{Proto} is split 
 \begin{enumerate}
 	\item \code{Proto} is constructed along with data structures necessary for basic operations at runtime. This includes semaphores, channels for \textit{control messages} and so on. This minutia is detailed in Section~\ref{sec:protocol_object_architecture}.
 	
-	\item In construction, the behavioral specification (ie.\ imperative form rules) are \textit{preprocessing}  to a form more conducive to efficient execution. For example, symbolic names are replaced with indices, pointers and keys into concrete data structures. The \textit{soundness checks} in the section to follow can be considered preprocessing also, as they ensure a \code{Proto} is constructed such that it is internally consistent, ensuring various runtime properties are invariant and need not be checked at runtime.
+	\item In construction, the behavioral specification (i.e.,\ imperative form rules) are \textit{preprocessing}  to a form more conducive to efficient execution. For example, symbolic names are replaced with indices, pointers and keys into concrete data structures. The \textit{soundness checks} in the section to follow can be considered preprocessing also, as they ensure a \code{Proto} is constructed such that it is internally consistent, ensuring various runtime properties are invariant and need not be checked at runtime.
 \end{enumerate}
 
 
 \subsubsection{Soundness Check}
-Our backend is novel in that the work of constructing the executable protocol object requires crossing an API boundary. Rather than trusting the well-formedness of the Reo-generated \code{ProtoDef}, Reo-rs will check that its input is internally consistent. By adding these checks, the dependency between the Reo compiler and Reo-rs is \textit{unidirectional}; users are free to safely construct protocol objects using Reo-rs in their applications directly. The most obvious advantage to this approach is an additional layer of safety, allowing for the compiler and Reo-rs to be maintained separately, eg.\ if the compiler acquires a bug from a new update, the error cannot propagate into Reo-rs unnoticed. Another advantage is the avenues for future work this opens up. Our approach treats protocol structures as data, facilitating their mutation at runtime, resulting in \textit{dynamic protocol reconfiguration}, although exploring this further is beyond the scope of this work.
+Our backend is novel in that the work of constructing the executable protocol object requires crossing an API boundary. Rather than trusting the well-formedness of the Reo-generated \code{ProtoDef}, Reo-rs will check that its input is internally consistent. By adding these checks, the dependency between the Reo compiler and Reo-rs is \textit{unidirectional}; users are free to safely construct protocol objects using Reo-rs in their applications directly. The most obvious advantage to this approach is an additional layer of safety, allowing for the compiler and Reo-rs to be maintained separately, e.g.,\ if the compiler acquires a bug from a new update, the error cannot propagate into Reo-rs unnoticed. Another advantage is the avenues for future work this opens up. Our approach treats protocol structures as data, facilitating their mutation at runtime, resulting in \textit{dynamic protocol reconfiguration}, although exploring this further is beyond the scope of this work.
 
-In native Rust, the usual variable scoping rules apply to ensure that a symbolic identifier is resolved to a meaningful memory position. These systems are so familiar to us that we usually take the complexity of their work for granted. Rules that are second nature to us require explicit enforcement to replicate the work of the checker. As \code{ProtoDef} \textit{commandifies} the behavior to be later executed, the Rust compiler does not interpret these actions in the normal way, and we must mimic its behavior manually. We take this idea a step further by relying on the \code{ProtoDef}'s \textit{premise} to facilitate a mechanism that mimics the Rust \textit{borrow checker} system; rules trace which variables are \textit{valid} (ie.\ initialized) throughout the rule's execution top to bottom, tracking changes as a result of actions filling or swapping their values. In this manner, we are able to catch invalid memory accesses during \code{build}, rather than encountering them at runtime. An additional perk of mimicking this system is our ability to detect the occurrence of values which \textit{must} be consumed during the rule's firing, but whose consumption is not included in the specification. For example, an \textit{imperative rule} may include some putter port $P$ in its ready set (and thus, its synchronization constraint), but associate no \textit{movement} with $P$'s value. A na\"ive implementation which overlooks such occurrences may introduce \textit{memory leaks} for such cases if it takes the specification at face value. Instead, our custom borrow checker will reach the end of of the specified actions and conclude that as $P$ was not explicitly emptied, it will insert a trivial movement $P\mapsto{} \{\}$ to ensure the value is consumed. This is analogous to how Rust's borrow checker inserts \code{drop} calls to destroy local variables which go out of scope unconsumed. By performing this extensive checking, Reo-rs affords an expressive \code{build} function, capable of giving detailed error information in response to an invalid input. The signature of this function is given in Listing~\ref{listing:build}.
+In native Rust, the usual variable scoping rules apply to ensure that a symbolic identifier is resolved to a meaningful memory position. These systems are so familiar to us that we usually take the complexity of their work for granted. Rules that are second nature to us require explicit enforcement to replicate the work of the checker. As \code{ProtoDef} \textit{commandifies} the behavior to be later executed, the Rust compiler does not interpret these actions in the normal way, and we must mimic its behavior manually. We take this idea a step further by relying on the \code{ProtoDef}'s \textit{premise} to facilitate a mechanism that mimics the Rust \textit{borrow checker} system; rules trace which variables are \textit{valid} (i.e.,\ initialized) throughout the rule's execution top to bottom, tracking changes as a result of actions filling or swapping their values. In this manner, we are able to catch invalid memory accesses during \code{build}, rather than encountering them at runtime. An additional perk of mimicking this system is our ability to detect the occurrence of values which \textit{must} be consumed during the rule's firing, but whose consumption is not included in the specification. For example, an \textit{imperative rule} may include some putter port $P$ in its ready set (and thus, its synchronization constraint), but associate no \textit{movement} with $P$'s value. A na\"ive implementation which overlooks such occurrences may introduce \textit{memory leaks} for such cases if it takes the specification at face value. Instead, our custom borrow checker will reach the end of of the specified actions and conclude that as $P$ was not explicitly emptied, it will insert a trivial movement $P\mapsto{} \{\}$ to ensure the value is consumed. This is analogous to how Rust's borrow checker inserts \code{drop} calls to destroy local variables which go out of scope unconsumed. By performing this extensive checking, Reo-rs affords an expressive \code{build} function, capable of giving detailed error information in response to an invalid input. The signature of this function is given in Listing~\ref{listing:build}.
 
 
 \begin{listing}[ht]
