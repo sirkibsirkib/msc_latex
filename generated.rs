@@ -1,11 +1,11 @@
 use reo_rs::*;
 fn instantiate<T: FromStr>() -> ProtoHandle {
     let type_info = TypeInfo::of::<T>();
-    let mem_init = MemInitial::default().with("m", "VALUE".from_str())
+    let mem_init = MemInitial::default().with("m", "VALUE".from_str());
     let proto_def = ProtoDef {
         name_defs: {
-            "A"   => Port { putter: true,  type_info },
-            "B"   => Port { putter: false, type_info },
+            "A" => Port { putter: true,  type_info },
+            "B" => Port { putter: false, type_info },
             "m" => Memo(type_info),
         },
         rules: [
