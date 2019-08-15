@@ -1,10 +1,10 @@
-pub fn something<T: PrintsBool>() {
-    T::print(true);
+pub fn something<T>(val: &T) where T: PrintsBool {
+    val.greet()
 }
-trait PrintsBool {
-    fn print(bool);
+trait Greets {
+    fn greet(&self);
 }
-impl PrintsBool for String {
-    fn print(b: bool) {
-        println!("bool is: {}", b)
+impl Greets for String {
+    fn greet(&self) {
+        println!("hello!")
 }   }
