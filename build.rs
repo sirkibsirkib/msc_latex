@@ -1,4 +1,3 @@
-fn build_proto(&ProtoDef, MemInitial) -> Result<ProtoHandle, BuildError>;
 type BuildError = (Option<usize>, BuildErrorInfo);
 enum BuildErrorInfo {
     ConflictingMemPremise { name: Ident },

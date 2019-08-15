@@ -301,7 +301,7 @@ note: expected 'DoTwo' but argument is of type 'DoOne'
 The type state pattern can be applied in any typed language, but it is particularly meaningful in languages where the compiler or interpreter enforces its intended use. The example above demonstrates some utility, but a language such as C has no fundamental way to prevent the programmer from reusing values. 
 If the programmer misbehaves, they can retain their previous states when given new ones, and then invoke the transition operations as they please. It's not much of a state machine if all states coexist, is it? This is not always a problem in examples such as the previous. Here, the types prevent the construction of malformed expressions, and perhaps this is enough. However, we cannot so easily protect a resource from any side effects of \code{one} or \code{two}; imagine the chaos that would result from these functions writing to a persistent file descriptor.
 \begin{listing}[ht]
-	\inputminted[linenos,tabsize=2,breaklines,frame=lines]{c}{typestate_e.g.,c}
+	\inputminted[linenos,tabsize=2,breaklines,frame=lines]{c}{typestate_eg.c}
 	\caption[Type state automaton in C with expressions modeling runs.]{An example of the type-state pattern in the C language. The alternating invocation of \code{one} and \code{two} is translated to type checking the compiler can guarantee. This example guarantees that well-formed expressions can be interpreted as valid paths in some corresponding automaton, as the types must match.}
 	\label{listing:typestateeg}
 \end{listing}
