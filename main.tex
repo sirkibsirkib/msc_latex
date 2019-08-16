@@ -85,8 +85,8 @@
 	frame=lines,
 	samepage=true
 }
-
-\newcommand{\code}[1]{\textcolor{blue}{\texttt{#1}}}
+\definecolor{codecol}{RGB}{0, 0, 180}
+\newcommand{\code}[1]{\textcolor{codecol}{\texttt{#1}}}
 \newcommand{\gapwedge}{\ \wedge{}\ }
 \newcommand{\ruledef}[4]{
 	#1 & \texttt{#3} & $\rightarrow{}$ & \texttt{#4} & #2 \\
@@ -119,10 +119,10 @@
 \clubpenalty10000
 
 \definecolor{dblue}{rgb}{0.1,0.2,0.6}
-\definecolor{dgreen}{rgb}{0.1,0.6,0.2}
+\definecolor{dgreen}{rgb}{0.1,0.5,0.1}
 \definecolor{dred}{rgb}{0.6,0.1,0.1}
 \usepackage[linktocpage=true]{hyperref}
-\hypersetup{colorlinks,linkcolor={dblue}, citecolor={dred},urlcolor={dred}}  
+\hypersetup{colorlinks,linkcolor={dgreen}, citecolor={dred},urlcolor={dred}}  
 
 \usepackage{epigraph}
 \renewcommand{\epigraphsize}{\small}
