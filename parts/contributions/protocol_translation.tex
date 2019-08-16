@@ -93,7 +93,7 @@ Previously, we observed that the translation work from Reo to its targets can be
 
 Performing the translation in clear stages is beneficial to both Reo and its target languages. The benefits to new targets is clear; they may acquire Reo support with less effort than otherwise. Existing target languages are able to benefit also, as they are able to implement the same IF using different concrete translation procedures, i.e., they may implement $T_{CA}$ and $T_{CT}$ differently. Regardless of concrete implementation, protocol objects stemming with an IF specification in common are safe in the knowledge taht they will agree on their abstract action sequences, and the abstract types of their ports.
 
-For the sake of limiting the scope of the project, we relegate IF to a tool unique to the generation of the Rust language; as far as the user is concerned, the Rust backend emits Rust directly, which they are able to use as part of their Rust programs. Future work may remove this restriction by having Reo support IF as a compilation target directly.
+For the sake of limiting the scope of the project, we relegate IF to a tool unique to the generation of the Rust language; as far as the user is concerned, the Rust backend emits Rust directly, which they are able to use as part of their Rust programs. Future work may remove this restriction by having Reo support IF as a compilation target directly. For a more detailed discussion, see Section~\ref{sec:future_imperative_compiler}.
 
 \section{Imperative Form}
 \label{sec:imperative_form_sec}
